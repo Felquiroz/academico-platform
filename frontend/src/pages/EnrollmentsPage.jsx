@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import { useRefresh } from '../context/RefreshContext';
-import { HiOutlineCheck, , HiOutlineUserAdd, HiOutlineSearch, HiOutlineClipboardList } from 'react-icons/hi';
+import { HiOutlineCheck, HiOutlineUserAdd, HiOutlineSearch, HiOutlineClipboardList } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 export default function EnrollmentsPage() {
