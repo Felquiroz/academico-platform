@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const errorHandler = require('./middleware/errorHandler');
+const { initTables } = require('./database/initTables');
 
 // Importar rutas
 const authRoutes = require('./routes/authRoutes');
@@ -19,7 +20,7 @@ const requestRoutes = require('./routes/requestRoutes');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:5173', 'http://localhost:5174'];
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:5173', 'http://localhost:5174', 'https://academico-platform.vercel.app'];
 
 // ============================================
 // MIDDLEWARES GLOBALES
@@ -80,6 +81,11 @@ app.use((req, res) => {
 
 // Error handler global
 app.use(errorHandler);
+
+// ============================================
+// Crear tablas al iniciar (solo si no existen)
+// ============================================
+initTables();
 
 // ============================================
 // INICIAR SERVIDOR
