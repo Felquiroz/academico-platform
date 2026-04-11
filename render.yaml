@@ -19,3 +19,7 @@ services:
     repo: https://github.com/Felquiroz/academico-platform
     branch: main
     rootDirectory: backend
+  - type: mysql
+    name: railway-mysql
+    plan: free
+    region: oregon
