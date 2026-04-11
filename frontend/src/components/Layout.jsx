@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { HiOutlineHome, HiOutlineCalendar, HiOutlineClipboardList, HiOutlineOfficeBuilding,
   HiOutlineAcademicCap, HiOutlineUsers, HiOutlineCog, HiOutlineBell, HiOutlineLogout,
-  HiOutlineShieldCheck, HiOutlineMenu, HiOutlineX, HiOutlineSun, HiOutlineMoon, HiOutlineSearch } from 'react-icons/hi';
+  HiOutlineShieldCheck, HiOutlineMenu, HiOutlineSun, HiOutlineMoon, HiOutlineSearch } from 'react-icons/hi';
 
 export default function Layout() {
   const { user, logout, canManage, isAdmin } = useAuth();
@@ -115,7 +115,7 @@ export default function Layout() {
       <button className="btn btn-icon" onClick={() => setMobileOpen(!mobileOpen)}
         style={{ position: 'fixed', top: 12, left: 12, zIndex: 200, display: 'none' }}
         id="mobile-menu-toggle">
-        {mobileOpen ? X : <HiOutlineMenu />}
+        {mobileOpen ? × : <HiOutlineMenu />}
       </button>
 
       {/* Global Search */}

@@ -6,7 +6,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { HiOutlineTrash, HiOutlineUserGroup, HiOutlineLocationMarker, HiOutlineX } from 'react-icons/hi';
+import { HiOutlineTrash, HiOutlineUserGroup, HiOutlineLocationMarker,  } from 'react-icons/hi';
 
 const defaultColors = [
   { bg: 'rgba(99,102,241,0.3)', border: '#6366f1', text: '#a5b4fc' },
@@ -216,7 +216,7 @@ export default function CalendarPage() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
             <div className="modal-header">
               <h3 className="modal-title">{selectedEvent.title}</h3>
-              <button className="btn btn-icon" onClick={() => setShowModal(false)}>X</button>
+              <button className="btn btn-icon" onClick={() => setShowModal(false)}>×</button>
             </div>
             <div style={{ padding: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

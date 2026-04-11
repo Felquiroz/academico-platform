@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import { useRefresh } from '../context/RefreshContext';
-import { HiOutlineCheck, HiOutlineX, HiOutlineUserAdd, HiOutlineSearch, HiOutlineClipboardList } from 'react-icons/hi';
+import { HiOutlineCheck, , HiOutlineUserAdd, HiOutlineSearch, HiOutlineClipboardList } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 export default function EnrollmentsPage() {
@@ -143,7 +143,7 @@ export default function EnrollmentsPage() {
                           <HiOutlineCheck /> Aprobar
                         </button>
                         <button className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleReject(selectedActivity.id, enroll.user_id)}>
-                          X Rechazar
+                          × Rechazar
                         </button>
                       </div>
                     </div>

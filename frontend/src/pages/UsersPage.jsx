@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useRefresh } from '../context/RefreshContext';
-import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineSearch, HiOutlineX, HiOutlineMail } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineSearch, HiOutlineMail } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 export default function UsersPage() {
@@ -155,7 +155,7 @@ export default function UsersPage() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
             <div className="modal-header">
               <h3 className="modal-title">{editingId ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
-              <button className="btn btn-icon" onClick={() => setShowModal(false)}>X</button>
+              <button className="btn btn-icon" onClick={() => setShowModal(false)}>×</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="form-group">

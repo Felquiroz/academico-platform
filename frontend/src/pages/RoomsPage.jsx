@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import { useRefresh } from '../context/RefreshContext';
-import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineX } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash,  } from 'react-icons/hi';
 
 export default function RoomsPage() {
   const { get, post, put, del } = useApi();

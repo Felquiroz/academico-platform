@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import { useRefresh } from '../context/RefreshContext';
-import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineSearch, HiOutlineX } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineSearch } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 export default function ProgramsPage() {
@@ -94,7 +94,7 @@ export default function ProgramsPage() {
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h3 className="modal-title">{editingId ? 'Editar Programa' : 'Nuevo Programa'}</h3><button className="btn btn-icon" onClick={() => setShowModal(false)}>X</button></div>
+            <div className="modal-header"><h3 className="modal-title">{editingId ? 'Editar Programa' : 'Nuevo Programa'}</h3><button className="btn btn-icon" onClick={() => setShowModal(false)}>×</button></div>
             <form onSubmit={handleSubmit}>
               <div className="form-group"><label className="form-label">Nombre *</label><input className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></div>
               <div className="form-group"><label className="form-label">Descripción</label><textarea className="form-textarea" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
