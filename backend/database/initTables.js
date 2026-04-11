@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 const dbConfig = {
@@ -180,6 +181,19 @@ async function initTables() {
     
     const [tables] = await connection.query('SHOW TABLES');
     console.log('📋 Tablas creadas:', tables.map(t => Object.values(t)[0]).join(', '));
+    
+    const [users] = await connection.query('SELECT COUNT(*) as count FROM users');
+    if (users[0].count === 0) {
+      console.log('🔄 Creando usuario admin por defecto...');
+      const passwordHash = await bcrypt.hash('admin123', 10);
+      await connection.query(
+        'INSERT INTO users (name, email, password_hash, role, phone) VALUES (?, ?, ?, ?, ?)',
+        ['Administrador', 'admin@academico.cl', passwordHash, 'admin', '+56912345678']
+      );
+      console.log('✅ Usuario admin creado: admin@academico.cl / admin123');
+    } else {
+      console.log('📋 Usuarios ya existentes:', users[0].count);
+    }
     
   } catch (error) {
     console.error('❌ Error creando tablas:', error.message);
