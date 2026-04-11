@@ -143,7 +143,7 @@ export default function EnrollmentsPage() {
                           <HiOutlineCheck /> Aprobar
                         </button>
                         <button className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleReject(selectedActivity.id, enroll.user_id)}>
-                          <HiOutlineX /> Rechazar
+                          X Rechazar
                         </button>
                       </div>
                     </div>

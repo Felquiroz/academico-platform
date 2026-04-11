@@ -126,7 +126,7 @@ export default function RequestsPage() {
                     <HiOutlineCheck /> Aprobar
                   </button>
                   <button className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleReject(req.id)}>
-                    <HiOutlineX /> Rechazar
+                    X Rechazar
                   </button>
                 </div>
               )}

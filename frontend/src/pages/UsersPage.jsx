@@ -155,7 +155,7 @@ export default function UsersPage() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
             <div className="modal-header">
               <h3 className="modal-title">{editingId ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
-              <button className="btn btn-icon" onClick={() => setShowModal(false)}><HiOutlineX /></button>
+              <button className="btn btn-icon" onClick={() => setShowModal(false)}>X</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="form-group">

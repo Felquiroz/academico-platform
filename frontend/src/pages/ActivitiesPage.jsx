@@ -210,7 +210,7 @@ export default function ActivitiesPage() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
             <div className="modal-header">
               <h3 className="modal-title">{editingId ? 'Editar Actividad' : 'Nueva Actividad'}</h3>
-              <button className="btn btn-icon" onClick={() => setShowModal(false)}><HiOutlineX /></button>
+              <button className="btn btn-icon" onClick={() => setShowModal(false)}>X</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="form-group">

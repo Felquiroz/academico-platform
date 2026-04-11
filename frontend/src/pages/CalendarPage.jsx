@@ -216,7 +216,7 @@ export default function CalendarPage() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
             <div className="modal-header">
               <h3 className="modal-title">{selectedEvent.title}</h3>
-              <button className="btn btn-icon" onClick={() => setShowModal(false)}><HiOutlineX /></button>
+              <button className="btn btn-icon" onClick={() => setShowModal(false)}>X</button>
             </div>
             <div style={{ padding: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

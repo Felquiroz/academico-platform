@@ -115,7 +115,7 @@ export default function Layout() {
       <button className="btn btn-icon" onClick={() => setMobileOpen(!mobileOpen)}
         style={{ position: 'fixed', top: 12, left: 12, zIndex: 200, display: 'none' }}
         id="mobile-menu-toggle">
-        {mobileOpen ? <HiOutlineX /> : <HiOutlineMenu />}
+        {mobileOpen ? X : <HiOutlineMenu />}
       </button>
 
       {/* Global Search */}
