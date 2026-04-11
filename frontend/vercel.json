@@ -1,5 +1,5 @@
 {
-  "buildCommand": "rm -rf node_modules/.vite && npm run build",
+  "buildCommand": "rm -rf node_modules/.vite node_modules/.cache dist && npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
@@ -8,5 +8,5 @@
   "env": {
     "VITE_API_URL": "@vercel-env-api-url"
   },
-  "installCommand": "npm install"
+  "installCommand": "rm -rf node_modules && npm install"
 }
