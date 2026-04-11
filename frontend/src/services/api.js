@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.DEV ? 'http://localhost:4000/api' : 'https://academico-platform.onrender.com/api';
+const PROD_API = 'https://academico-platform.onrender.com/api';
+const API_URL = PROD_API;
 
 const api = axios.create({
   baseURL: API_URL,
