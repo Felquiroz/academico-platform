@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: academico-backend
+    env: node
+    region: oregon
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: DATABASE_URL
+        value: mysql://root:$2a$10$1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK.bQv1Z6XK@containers-us-west-158.railway.app:7670/railway
+        # NOTE: Replace with your actual Railway DATABASE_URL
+      - key: JWT_SECRET
+        value: academico2024secreto
+      - key: PORT
+        value: 4000
+      - key: ALLOWED_ORIGINS
+        value: https://academico-platform.vercel.app
+      - key: NODE_ENV
+        value: production
+    repo: https://github.com/Felquiroz/academico-platform
+    branch: main
+    rootDirectory: backend
