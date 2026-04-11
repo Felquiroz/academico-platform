@@ -195,6 +195,48 @@ async function initTables() {
       console.log('📋 Usuarios ya existentes:', users[0].count);
     }
     
+    const [programs] = await connection.query('SELECT COUNT(*) as count FROM programs');
+    if (programs[0].count === 0) {
+      console.log('🔄 Creando programas de ejemplo...');
+      await connection.query(`
+        INSERT INTO programs (name, description, type, start_date, end_date) VALUES
+        ('Diplomado en Gestión de Proyectos', 'Programa de especialización en metodologías ágiles y gestión de proyectos empresariales.', 'diplomado', '2026-03-01', '2026-08-30'),
+        ('Diplomado en Inteligencia Artificial Aplicada', 'Fundamentos y aplicaciones prácticas de IA en entornos empresariales.', 'diplomado', '2026-04-15', '2026-10-15'),
+        ('Magíster en Administración de Empresas (MBA)', 'Programa avanzado de gestión empresarial con enfoque en innovación y liderazgo.', 'magister', '2026-03-01', '2027-12-31'),
+        ('Diplomado en Ciberseguridad', 'Técnicas y herramientas para la protección de sistemas e información digital.', 'diplomado', '2026-05-01', '2026-11-30'),
+        ('Magíster en Ciencia de Datos', 'Programa avanzado en análisis de datos, machine learning y visualización.', 'magister', '2026-03-15', '2027-12-15')
+      `);
+      console.log('✅ Programas de ejemplo creados');
+    }
+    
+    const [rooms] = await connection.query('SELECT COUNT(*) as count FROM rooms');
+    if (rooms[0].count === 0) {
+      console.log('🔄 Creando salas de ejemplo...');
+      await connection.query(`
+        INSERT INTO rooms (name, capacity, location, equipment) VALUES
+        ('Sala Auditorio Principal', 120, 'Edificio A, Piso 1', '["proyector_4k", "sistema_audio", "microfono_inalambrico"]'),
+        ('Sala B-201', 40, 'Edificio B, Piso 2', '["proyector", "pizarra_blanca", "wifi"]'),
+        ('Sala B-202', 40, 'Edificio B, Piso 2', '["proyector", "pizarra_blanca", "wifi"]'),
+        ('Sala C-301 (Lab)', 30, 'Edificio C, Piso 3', '["computadores", "proyector", "pizarra_digital"]'),
+        ('Sala D-101 (Ejecutiva)', 15, 'Edificio D, Piso 1', '["smart_tv", "videoconferencia", "wifi_premium"]')
+      `);
+      console.log('✅ Salas de ejemplo creadas');
+    }
+    
+    const [services] = await connection.query('SELECT COUNT(*) as count FROM services');
+    if (services[0].count === 0) {
+      console.log('🔄 Creando servicios de ejemplo...');
+      await connection.query(`
+        INSERT INTO services (name, description, cost_per_person, provider) VALUES
+        ('Coffee Break Básico', 'Café, té, agua, galletas y fruta de temporada', 3500, 'Catering Los Andes'),
+        ('Coffee Break Premium', 'Café especial, jugos naturales, sándwiches, pasteles', 6500, 'Catering Los Andes'),
+        ('Kit de Materiales', 'Carpeta, cuaderno, lápiz, credencial impresa', 4500, 'Imprenta Rápida'),
+        ('Almuerzo Ejecutivo', 'Menú completo con entrée, plato principal, postre y bebida', 12000, 'Restaurante Gourmet'),
+        ('Coffee Break Vegetariano', 'Opciones vegetarianas y veganas', 4500, 'Catering Verde')
+      `);
+      console.log('✅ Servicios de ejemplo creados');
+    }
+    
   } catch (error) {
     console.error('❌ Error creando tablas:', error.message);
   } finally {
