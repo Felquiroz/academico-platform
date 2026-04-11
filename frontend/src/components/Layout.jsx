@@ -119,7 +119,7 @@ export default function Layout() {
       </button>
 
       {/* Global Search */}
-      <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 200 }}>
+      <div className="search-container" style={{ position: 'fixed', top: 12, right: 12, zIndex: 200 }}>
         <div style={{ position: 'relative' }}>
           <input 
             placeholder="Buscar..." 
@@ -172,6 +172,9 @@ export default function Layout() {
         </div>
       </div>
 
+      {/* Mobile overlay */}
+      {mobileOpen && <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />}
+      
       {/* Sidebar */}
       <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
