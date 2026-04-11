@@ -56,7 +56,7 @@ export default function ActivitiesPage() {
       if (filterProgram) params.set('program_id', filterProgram);
       if (filterStatus) params.set('status', filterStatus);
       
-      const response = await fetch(`http://localhost:4000/api/activities/export?format=csv&${params}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://academico-platform.onrender.com/api'}/activities/export?format=csv&${params}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
       });
       
