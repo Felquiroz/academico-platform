@@ -1,3 +1,4 @@
+// App version 2.0 - Production Build
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RefreshProvider } from './context/RefreshContext';
