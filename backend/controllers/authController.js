@@ -3,6 +3,9 @@ const User = require('../models/User');
 const pool = require('../config/db');
 const { logAudit } = require('../middleware/audit');
 
+const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
+const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+
 /**
  * Controlador de Autenticación
  */
@@ -119,11 +122,11 @@ const authController = {
       // Generar tokens
       const payload = { id: user.id, email: user.email, role: user.role };
       
-      const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { 
+      const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { 
         expiresIn: process.env.JWT_EXPIRES_IN || '1h' 
       });
 
-      const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { 
+      const refreshToken = jwt.sign(payload, REFRESH_TOKEN_SECRET, { 
         expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' 
       });
 
@@ -170,7 +173,7 @@ const authController = {
       }
 
       // Verificar JWT
-      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
       const user = await User.findById(decoded.id);
 
       if (!user || !user.active) {
@@ -179,7 +182,7 @@ const authController = {
 
       // Generar nuevo access token
       const payload = { id: user.id, email: user.email, role: user.role };
-      const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, { 
+      const newAccessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { 
         expiresIn: process.env.JWT_EXPIRES_IN || '1h' 
       });
 

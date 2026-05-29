@@ -5,6 +5,7 @@ import { useApi } from '../hooks/useApi';
 import { HiOutlineHome, HiOutlineCalendar, HiOutlineClipboardList, HiOutlineOfficeBuilding,
   HiOutlineAcademicCap, HiOutlineUsers, HiOutlineCog, HiOutlineBell, HiOutlineLogout,
   HiOutlineShieldCheck, HiOutlineMenu, HiOutlineSun, HiOutlineMoon, HiOutlineSearch } from 'react-icons/hi';
+import Chatbot from './Chatbot';
 
 export default function Layout() {
   const { user, logout, canManage, isAdmin } = useAuth();
@@ -231,6 +232,8 @@ export default function Layout() {
       <main className="main-content fade-in">
         <Outlet />
       </main>
+
+      <Chatbot />
     </div>
   );
 }

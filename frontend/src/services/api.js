@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const PROD_API = 'https://academico-platform.onrender.com/api';
-const API_URL = PROD_API;
+const DEV_API = 'http://localhost:4000/api';
+const API_URL = DEV_API; // Cambiar a PROD_API para producción
 
 const api = axios.create({
   baseURL: API_URL,
