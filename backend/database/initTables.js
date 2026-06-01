@@ -184,13 +184,29 @@ async function initTables() {
     
     const [users] = await connection.query('SELECT COUNT(*) as count FROM users');
     if (users[0].count === 0) {
-      console.log('🔄 Creando usuario admin por defecto...');
-      const passwordHash = await bcrypt.hash('admin123', 10);
+      console.log('🔄 Creando usuarios de prueba...');
+      const adminHash = await bcrypt.hash('admin123', 10);
+      const coordHash = await bcrypt.hash('coord123', 10);
+      const userHash = await bcrypt.hash('user123', 10);
       await connection.query(
-        'INSERT INTO users (name, email, password_hash, role, phone) VALUES (?, ?, ?, ?, ?)',
-        ['Administrador', 'admin@academico.cl', passwordHash, 'admin', '+56912345678']
+        `INSERT INTO users (name, email, password_hash, role, phone) VALUES
+        ('Administrador General', 'admin@academico.cl', ?, 'admin', '+56912345678'),
+        ('María González', 'maria.gonzalez@academico.cl', ?, 'coordinator', '+56923456789'),
+        ('Carlos Pérez', 'carlos.perez@academico.cl', ?, 'coordinator', '+56934567890'),
+        ('Ana Rodríguez', 'ana.rodriguez@academico.cl', ?, 'user', '+56945678901'),
+        ('Luis Martínez', 'luis.martinez@academico.cl', ?, 'user', '+56956789012'),
+        ('Sofía Hernández', 'sofia.hernandez@academico.cl', ?, 'user', '+56967890123'),
+        ('Diego Morales', 'diego.morales@academico.cl', ?, 'user', '+56978901234'),
+        ('Valentina Soto', 'valentina.soto@academico.cl', ?, 'user', '+56989012345'),
+        ('Fernando López', 'fernando.lopez@academico.cl', ?, 'user', '+56990123456'),
+        ('Camila Díaz', 'camila.diaz@academico.cl', ?, 'user', '+56901234567')`,
+        [adminHash, coordHash, coordHash, userHash, userHash, userHash, userHash, userHash, userHash, userHash]
       );
-      console.log('✅ Usuario admin creado: admin@academico.cl / admin123');
+      console.log('✅ Usuarios de prueba creados:');
+      console.log('   Admin:       admin@academico.cl / admin123');
+      console.log('   Coordinador: maria.gonzalez@academico.cl / coord123');
+      console.log('   Coordinador: carlos.perez@academico.cl / coord123');
+      console.log('   Usuario:     ana.rodriguez@academico.cl / user123');
     } else {
       console.log('📋 Usuarios ya existentes:', users[0].count);
     }
