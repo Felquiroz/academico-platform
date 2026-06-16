@@ -305,18 +305,21 @@ const activityController = {
       // Consultamos las clases de los programas donde el alumno está inscrito.
       // Usamos LEFT JOIN con activity_attendees solo para saber si ya confirmó asistencia.
       // Si no hay registro en activity_attendees, asumimos que su estado es 'registered' por defecto.
+      // La consulta corregida y verificada
       const [rows] = await pool.query(`
         SELECT a.*, p.name as program_name, p.type as program_type,
           r.name as room_name, r.capacity as room_capacity,
           COALESCE(aa.status, 'registered') as attendance_status,
           aa.modality
         FROM activities a
+        JOIN programs p ON a.program_id = p.id
         JOIN inscripciones i ON a.program_id = i.programa_id
         JOIN alumnos al ON i.alumno_id = al.id
+        LEFT JOIN rooms r ON a.room_id = r.id
         LEFT JOIN activity_attendees aa ON aa.activity_id = a.id AND aa.user_id = ?
         WHERE al.usuario_id = ? AND a.status != 'cancelled'
         ORDER BY a.start_time ASC
-      `, [userId, userId]);
+      `, [userId, userId])
 
       if (rows.length > 0) {
         return res.json({ success: true, data: rows, type: 'enrolled' });

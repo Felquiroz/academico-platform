@@ -5,8 +5,23 @@ const attendeeController = require('../controllers/attendeeController');
 const serviceController = require('../controllers/serviceController');
 const authenticate = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
+const checkRole = require('../middleware/authRole');
 
 router.use(authenticate);
+
+// Ruta protegida: solo 'user' (estudiante) puede acceder
+router.get('/my-activities', 
+  auth, 
+  checkRole(['user', 'alumno']), // Solo permite estos roles
+  activityController.getMyActivities
+);
+
+// Ruta protegida: solo 'user' (estudiante) puede acceder
+router.get('/my-programs', 
+  auth, 
+  checkRole(['user', 'alumno']), 
+  activityController.getMyPrograms
+);
 
 // Rutas especiales
 router.get('/upcoming', activityController.getUpcoming);
