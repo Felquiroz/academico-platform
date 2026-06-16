@@ -10,124 +10,97 @@ Plataforma web para la gestión académica de diplomados y magísteres.
 
 ---
 
-## Instalación local
+## Instalación paso a paso
 
 ### Requisitos previos
 
 Instalar en tu computador:
 
-- [Git](https://git-scm.com/)
-- [Node.js](https://nodejs.org/) 18 o superior
-- [MySQL Server](https://dev.mysql.com/downloads/mysql/) 8 o superior
+| Programa | Descarga | Propósito |
+|----------|----------|-----------|
+| [Git](https://git-scm.com/) | git-scm.com | Descargar el código |
+| [Node.js](https://nodejs.org/) v18+ | nodejs.org | Ejecutar el proyecto |
+| [MySQL Server](https://dev.mysql.com/downloads/mysql/) v8+ | dev.mysql.com | Base de datos |
 
-### 1. Clonar el repositorio
+### Paso 1: Clonar el repositorio
+
+Abre **Git Bash** o **PowerShell** y ejecuta:
 
 ```bash
 git clone https://github.com/Felquiroz/academico-platform.git
-cd academico-platform
+cd academico-platform/academico-platform
 ```
 
-### 2. Ejecutar el script de preparación
+### Paso 2: Ejecutar configuración automática
 
-```bat
-setup-local.bat
-```
+Doble clic en `setup-local.bat`
 
-Este script crea el archivo `.env` e instala las dependencias del frontend y backend.
+Este script automáticamente:
+- Detecta si MySQL está instalado
+- Pide la contraseña de MySQL si la necesita
+- Crea la base de datos
+- Instala todas las dependencias
 
-### 3. Configurar la contraseña de MySQL
+### Paso 3: Iniciar la aplicación
 
-Abre el archivo `backend/.env` y cambia el valor de `DB_PASSWORD`:
+Doble clic en `iniciar.bat`
 
-```
-DB_PASSWORD=tu_password_de_mysql
-```
+El navegador se abrirá automáticamente con la plataforma.
 
-Si no tienes MySQL instalado o no recuerdas la contraseña del usuario `root`, puedes:
+---
 
-1. Abrir **MySQL Workbench** (u otro cliente SQL)
-2. Conectarte como `root`
-3. Crear la base de datos ejecutando:
+## Credenciales de acceso
 
-```sql
-CREATE DATABASE academico_platform
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
-```
+| Campo | Valor |
+|-------|-------|
+| Email | admin@academico.cl |
+| Contraseña | admin123 |
 
-### 4. Iniciar la aplicación
+---
 
-Desde la carpeta raíz ejecuta:
-
-```bat
-iniciar.bat
-```
-
-Esto levantará el backend y el frontend en ventanas separadas.
-
-### 5. Abrir en el navegador
+## URLs de la aplicación
 
 | Servicio | URL |
 |----------|-----|
-| Frontend | http://localhost:5173 |
-| Backend API | http://localhost:4000/api |
-| Health check | http://localhost:4000/api/health |
-
-### Usuario por defecto
-
-Si la base de datos está vacía, se crea automáticamente un usuario administrador:
-
-- **Email:** admin@academico.cl
-- **Contraseña:** admin123
+| Aplicación | http://localhost:5173 |
+| API Backend | http://localhost:4000/api |
 
 ---
 
-## Inicio manual (por separado)
-
-Si prefieres iniciar cada parte por separado:
-
-**Backend:**
-
-```bash
-cd backend
-npm install
-npm start
-```
-
-**Frontend:**
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
----
-
-## Despliegue en producción
-
-El proyecto usa **Render** para el backend y **Railway** para la base de datos MySQL. La configuración está en `render.yaml`.
-
----
-
-## Problemas comunes
+## Solución de problemas
 
 ### MySQL no conecta
 
-- Verifica que el servicio MySQL esté iniciado.
-- Revisa que `DB_USER` y `DB_PASSWORD` en `backend/.env` sean correctos.
-- Asegúrate de que MySQL escuche en `localhost:3306`.
+1. Verificar que el servicio MySQL esté iniciado en **Services de Windows**
+2. Ejecutar `setup-local.bat` nuevamente
+3. Ingresar la contraseña correcta de MySQL
 
-### `mysql.exe` no se encuentra
+### El navegador no abre
 
-Agrega MySQL al `PATH` del sistema o crea la base de datos manualmente desde MySQL Workbench.
+Abrir manualmente: http://localhost:5173
 
-### El backend no inicia
+### Error de puertos
 
-- Verifica que el puerto `4000` esté libre.
-- Asegúrate de que exista `backend/.env`.
-- Verifica que `JWT_SECRET` y `JWT_REFRESH_SECRET` tengan valor.
+Cerrar otras aplicaciones que usen los puertos 4000 o 5173.
 
-### El frontend no abre
+---
 
-Verifica que el puerto `5173` no esté ocupado por otra aplicación.
+## Estructura del proyecto
+
+```
+academico-platform/
+├── backend/           # API con Node.js + Express
+│   ├── database/      # Scripts de base de datos
+│   ├── routes/        # Rutas de la API
+│   ├── middleware/     # Middlewares
+│   └── server.js      # Punto de entrada
+├── frontend/          # Interfaz con React + Vite
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   └── services/
+│   └── package.json
+├── setup-local.bat    # Configuración automática
+├── iniciar.bat        # Iniciar aplicación
+└── README.md
+```
