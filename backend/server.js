@@ -10,6 +10,7 @@ const { initTables } = require('./database/initTables');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const programRoutes = require('./routes/programRoutes');
+const alumnoRoutes = require('./routes/alumnosRoutes');
 const roomRoutes = require('./routes/roomRoutes');
 const activityRoutes = require('./routes/activityRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
@@ -64,6 +65,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/attendees', attendeeRoutes);
 app.use('/api/requests', requestRoutes);
+app.use('/api/alumnos', alumnoRoutes); // NUEVO: Ruta para alumnos
+
 
 // Ruta de health check
 app.get('/api/health', (req, res) => {

@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import { useRefresh } from '../context/RefreshContext';
-import { HiOutlineCalendar, HiOutlineCheck, HiOutlineClock, HiOutlineLocationMarker, HiOutlinePlus, HiOutlineUserAdd, HiOutlineAcademicCap } from 'react-icons/hi';
+import { HiOutlineCalendar, HiOutlineCheck, HiOutlineClock, HiOutlineLocationMarker, HiOutlineAcademicCap } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 export default function MyActivitiesPage() {
   const { get, post } = useApi();
   const { user } = useAuth();
   const { refreshTrigger, triggerRefresh } = useRefresh();
+  
   const [activities, setActivities] = useState([]);
   const [programs, setPrograms] = useState({ enrolled: [], available: [] });
   const [loading, setLoading] = useState(true);
@@ -33,17 +34,10 @@ export default function MyActivitiesPage() {
     setLoading(false);
   };
 
-  const handleConfirm = async (activityId) => {
+  // NUEVO: Ahora recibe la modalidad (presencial o remoto) y la envía al backend
+  const handleConfirm = async (activityId, modality) => {
     try {
-      await post(`/activities/${activityId}/confirm-attendance`, {}, { successMessage: '¡Asistencia confirmada!' });
-      fetchData();
-      triggerRefresh();
-    } catch {}
-  };
-
-  const handleEnroll = async (activityId) => {
-    try {
-      await post(`/activities/${activityId}/enroll`, {}, { successMessage: '¡Inscripción exitosa!' });
+      await post(`/activities/${activityId}/confirm-attendance`, { modalidad: modality }, { successMessage: `¡Asistencia ${modality} confirmada!` });
       fetchData();
       triggerRefresh();
     } catch {}
@@ -60,30 +54,39 @@ export default function MyActivitiesPage() {
     return { label: 'Programada', color: 'var(--accent-primary)', icon: '📋' };
   };
 
-  const canConfirm = (act) => {
-    if (act.attendance_status !== 'registered') return false;
-    const now = new Date();
-    const start = new Date(act.start_time);
-    const hoursUntilStart = (start - now) / (1000 * 60 * 60);
-    return hoursUntilStart <= 24 && hoursUntilStart >= -2;
-  };
-
   if (loading) return <div className="loading-page"><div className="spinner"></div></div>;
 
-  // Filter activities by selected program
+  // 1. Filtrar por programa seleccionado (si hay uno)
   const filteredActivities = selectedProgram 
     ? activities.filter(a => a.program_id === parseInt(selectedProgram))
     : activities;
 
-  // Separate activities by status
-  const enrolledActivities = filteredActivities.filter(a => a.attendance_status === 'registered' || a.attendance_status === 'confirmed' || a.attendance_status === 'attended');
-  const availableActivities = filteredActivities.filter(a => a.attendance_status === 'available');
-  const upcomingActivities = enrolledActivities.filter(a => new Date(a.start_time) > new Date() && a.status !== 'completed');
-  const pastActivities = enrolledActivities.filter(a => new Date(a.start_time) <= new Date() || a.status === 'completed');
+  // 2. Filtrar SOLO las actividades en las que el alumno está inscrito
+  const enrolledActivities = filteredActivities.filter(a => 
+    a.attendance_status === 'registered' || 
+    a.attendance_status === 'confirmed' || 
+    a.attendance_status === 'attended'
+  );
+
+  // 3. Dividir las actividades en 3 categorías para las nuevas secciones
+  // Clases futuras que AÚN NO confirma
+  const pendingConfirmationActivities = enrolledActivities.filter(a => 
+    new Date(a.start_time) > new Date() && a.status !== 'completed' && a.attendance_status === 'registered'
+  );
+  
+  // Clases futuras que YA confirmó
+  const confirmedUpcomingActivities = enrolledActivities.filter(a => 
+    new Date(a.start_time) > new Date() && a.status !== 'completed' && a.attendance_status === 'confirmed'
+  );
+
+  // Clases pasadas o completadas
+  const pastActivities = enrolledActivities.filter(a => 
+    new Date(a.start_time) <= new Date() || a.status === 'completed'
+  );
 
   const stats = {
     total: enrolledActivities.length,
-    upcoming: upcomingActivities.length,
+    pending: pendingConfirmationActivities.length,
     confirmed: enrolledActivities.filter(a => a.attendance_status === 'confirmed').length,
     attended: enrolledActivities.filter(a => a.attendance_status === 'attended').length
   };
@@ -141,12 +144,12 @@ export default function MyActivitiesPage() {
           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Clases</div>
         </div>
         <div className="card" style={{ textAlign: 'center', padding: 'var(--space-md)' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--success)' }}>{stats.confirmed}</div>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Confirmadas</div>
+          <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--warning)' }}>{stats.pending}</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Por Confirmar</div>
         </div>
         <div className="card" style={{ textAlign: 'center', padding: 'var(--space-md)' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--warning)' }}>{stats.upcoming}</div>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Próximas</div>
+          <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--success)' }}>{stats.confirmed}</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Confirmadas</div>
         </div>
         <div className="card" style={{ textAlign: 'center', padding: 'var(--space-md)' }}>
           <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--info)' }}>{stats.attended}</div>
@@ -154,54 +157,19 @@ export default function MyActivitiesPage() {
         </div>
       </div>
 
-      {/* Actividades Disponibles para Inscribirse */}
-      {availableActivities.length > 0 && (
-        <div style={{ marginBottom: 'var(--space-xl)' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 'var(--space-md)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <HiOutlineUserAdd /> Disponible para Inscribirse
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {availableActivities.map(act => {
-              const info = statusInfo(act);
-              return (
-                <div key={act.id} className="card" style={{ padding: 'var(--space-md)', borderLeft: '4px solid var(--success)', background: 'var(--bg-card-hover)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontSize: '1.2rem' }}>{info.icon}</span>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>{act.title}</h3>
-                        <span className="badge badge-purple">{act.program_name}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 16, fontSize: '0.85rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>📅 {new Date(act.start_time).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>🕐 {new Date(act.start_time).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} - {new Date(act.end_time).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
-                        {act.room_name && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>📍 {act.room_name}</span>}
-                      </div>
-                    </div>
-                    <button className="btn btn-primary btn-sm" onClick={() => handleEnroll(act.id)}>
-                      <HiOutlinePlus /> Inscribirse
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Próximas Clases */}
+      {/* SECCIÓN 1: Clases por Confirmar */}
       <div style={{ marginBottom: 'var(--space-xl)' }}>
         <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 'var(--space-md)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <HiOutlineCalendar /> Mis Próximas Clases
+          <HiOutlineCalendar /> Clases por Confirmar Asistencia
         </h2>
-        {upcomingActivities.length > 0 ? (
+        {pendingConfirmationActivities.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {upcomingActivities.map(act => {
+            {pendingConfirmationActivities.map(act => {
               const info = statusInfo(act);
               return (
-                <div key={act.id} className="card" style={{ padding: 'var(--space-md)', borderLeft: '4px solid var(--accent-primary)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
+                <div key={act.id} className="card" style={{ padding: 'var(--space-md)', borderLeft: '4px solid var(--warning)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                    <div style={{ flex: 1, minWidth: '250px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <span style={{ fontSize: '1.2rem' }}>{info.icon}</span>
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>{act.title}</h3>
@@ -213,16 +181,18 @@ export default function MyActivitiesPage() {
                         {act.room_name && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>📍 {act.room_name}</span>}
                       </div>
                     </div>
+                    
+                    {/* Botones para seleccionar modalidad */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                      <span className="badge" style={{ background: info.color, color: '#fff' }}>{info.label}</span>
-                      {canConfirm(act) && (
-                        <button className="btn btn-primary btn-sm" onClick={() => handleConfirm(act.id)}>
-                          <HiOutlineCheck /> Confirmar Asistencia
+                      <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>¿Cómo vas a asistir?</span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-primary btn-sm" onClick={() => handleConfirm(act.id, 'presencial')}>
+                          📍 Presencial
                         </button>
-                      )}
-                      {act.attendance_status === 'confirmed' && (
-                        <span className="badge badge-success">✅ Confirmado</span>
-                      )}
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleConfirm(act.id, 'remoto')}>
+                          💻 Remoto
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -231,13 +201,52 @@ export default function MyActivitiesPage() {
           </div>
         ) : (
           <div className="card empty-state">
-            <p>No tienes clases próximas</p>
-            {availableActivities.length > 0 && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Mira las actividades disponibles abajo</p>}
+            <p>No tienes clases pendientes por confirmar.</p>
           </div>
         )}
       </div>
 
-      {/* Historial */}
+      {/* SECCIÓN 2: Clases Confirmadas */}
+      <div style={{ marginBottom: 'var(--space-xl)' }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 'var(--space-md)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <HiOutlineCheck /> Clases Confirmadas
+        </h2>
+        {confirmedUpcomingActivities.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {confirmedUpcomingActivities.map(act => {
+              const info = statusInfo(act);
+              return (
+                <div key={act.id} className="card" style={{ padding: 'var(--space-md)', borderLeft: '4px solid var(--success)', background: 'var(--bg-card-hover)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: '1.2rem' }}>{info.icon}</span>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>{act.title}</h3>
+                        <span className="badge badge-purple">{act.program_name}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 16, fontSize: '0.85rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>📅 {new Date(act.start_time).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>🕐 {new Date(act.start_time).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} - {new Date(act.end_time).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                      <span className="badge badge-success" style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
+                        ✅ Confirmado {act.modality ? `(${act.modality})` : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="card empty-state">
+            <p>Aún no has confirmado asistencia a ninguna clase próxima.</p>
+          </div>
+        )}
+      </div>
+
+      {/* SECCIÓN 3: Historial */}
       <div>
         <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 'var(--space-md)', display: 'flex', alignItems: 'center', gap: 8 }}>
           📂 Historial de Clases
@@ -248,9 +257,9 @@ export default function MyActivitiesPage() {
               <div key={act.id} className="card" style={{ padding: 'var(--space-md)', opacity: 0.8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <h3 style={{ fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>{act.title}</h3>
-                  <span className="badge badge-success">
+                  <span className={`badge ${act.attendance_status === 'attended' ? 'badge-success' : 'badge-danger'}`}>
                     {act.attendance_status === 'attended' ? 'Asistió' : 
-                     act.attendance_status === 'confirmed' ? 'Confirmado' : 
+                     act.attendance_status === 'confirmed' ? 'Confirmado (Pendiente)' : 
                      'No asistió'}
                   </span>
                 </div>

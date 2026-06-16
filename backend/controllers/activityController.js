@@ -293,60 +293,33 @@ const activityController = {
     }
   },
 
+
   /**
    * GET /api/activities/my-activities
-    * Obtiene las actividades del usuario logueado
-    */
+   * Obtiene las actividades basándose en las inscripciones del alumno
+   */
   async getMyActivities(req, res, next) {
     try {
       const userId = req.user.id;
       
-      // Primero verificar si tiene inscripciones
-      const [enrollments] = await pool.execute(
-        'SELECT DISTINCT program_id FROM activity_attendees aa JOIN activities a ON a.id = aa.activity_id WHERE aa.user_id = ?',
-        [userId]
-      );
+      // Consultamos las clases de los programas donde el alumno está inscrito.
+      // Usamos LEFT JOIN con activity_attendees solo para saber si ya confirmó asistencia.
+      // Si no hay registro en activity_attendees, asumimos que su estado es 'registered' por defecto.
+      const [rows] = await pool.query(`
+        SELECT a.*, p.name as program_name, p.type as program_type,
+          r.name as room_name, r.capacity as room_capacity,
+          COALESCE(aa.status, 'registered') as attendance_status,
+          aa.modality
+        FROM activities a
+        JOIN inscripciones i ON a.program_id = i.programa_id
+        JOIN alumnos al ON i.alumno_id = al.id
+        LEFT JOIN activity_attendees aa ON aa.activity_id = a.id AND aa.user_id = ?
+        WHERE al.usuario_id = ? AND a.status != 'cancelled'
+        ORDER BY a.start_time ASC
+      `, [userId, userId]);
 
-      if (enrollments.length > 0) {
-        // Si tiene inscripciones, mostrar esas actividades
-        const [rows] = await pool.query(`
-          SELECT a.*, p.name as program_name, p.type as program_type,
-            r.name as room_name, r.capacity as room_capacity,
-            aa.status as attendance_status
-          FROM activities a
-          JOIN activity_attendees aa ON aa.activity_id = a.id
-          LEFT JOIN programs p ON p.id = a.program_id
-          LEFT JOIN rooms r ON r.id = a.room_id
-          WHERE aa.user_id = ? AND a.status != 'cancelled'
-          ORDER BY a.start_time ASC
-        `, [userId]);
+      if (rows.length > 0) {
         return res.json({ success: true, data: rows, type: 'enrolled' });
-      }
-
-      // Si no tiene inscripciones, buscar programas activos del usuario
-      const [programs] = await pool.query(`
-        SELECT DISTINCT p.*
-        FROM programs p
-        WHERE p.active = TRUE
-        ORDER BY p.start_date DESC
-        LIMIT 10
-      `);
-
-      // Obtener actividades de esos programas
-      if (programs.length > 0) {
-        const programIds = programs.map(p => p.id);
-        const [activities] = await pool.query(`
-          SELECT a.*, p.name as program_name, p.type as program_type,
-            r.name as room_name, r.capacity as room_capacity,
-            'available' as attendance_status
-          FROM activities a
-          LEFT JOIN programs p ON p.id = a.program_id
-          LEFT JOIN rooms r ON r.id = a.room_id
-          WHERE a.program_id IN (?) AND a.status = 'scheduled' AND a.start_time > NOW()
-          ORDER BY a.start_time ASC
-          LIMIT 20
-        `, [programIds]);
-        return res.json({ success: true, data: activities, type: 'available', programs });
       }
 
       res.json({ success: true, data: [], type: 'none' });
@@ -354,69 +327,69 @@ const activityController = {
       next(error);
     }
   },
-
+  
   /**
    * GET /api/activities/my-programs
-   * Obtiene los programas disponibles para el usuario
+   * Obtiene los programas en los que está inscrito el alumno
    */
   async getMyPrograms(req, res, next) {
     try {
       const userId = req.user.id;
 
-      // Programas donde el usuario está inscrito
+      // Buscamos los programas cruzando usuarios -> alumnos -> inscripciones
       const [enrolled] = await pool.query(`
-        SELECT DISTINCT p.*, 'enrolled' as enrollment_status
+        SELECT p.*, 'enrolled' as enrollment_status
         FROM programs p
-        JOIN activity_attendees aa ON aa.activity_id IN (SELECT id FROM activities WHERE program_id = p.id)
-        WHERE p.active = TRUE
-        GROUP BY p.id
+        JOIN inscripciones i ON i.programa_id = p.id
+        JOIN alumnos al ON al.id = i.alumno_id
+        WHERE al.usuario_id = ? AND p.active = TRUE
       `, [userId]);
 
-      // Programas disponibles (no inscrito)
-      const enrolledIds = enrolled.map(p => p.id);
-      let availableQuery = 'SELECT * FROM programs WHERE active = TRUE';
-      if (enrolledIds.length > 0) {
-        availableQuery += ` AND id NOT IN (${enrolledIds.join(',')})`;
-      }
-      const [available] = await pool.query(availableQuery + ' ORDER BY start_date DESC LIMIT 20');
-
-      res.json({ success: true, data: { enrolled, available } });
+      res.json({ success: true, data: { enrolled, available: [] } });
     } catch (error) {
       next(error);
     }
   },
-
+  
   /**
    * POST /api/activities/:activityId/confirm-attendance
-   * El usuario confirma su asistencia a una actividad
    */
   async confirmAttendance(req, res, next) {
     try {
       const activityId = req.params.activityId;
       const userId = req.user.id;
+      const { modalidad } = req.body;
 
-      // Verificar que el usuario está inscrito
-      const [attendee] = await pool.execute(
+      if (!modalidad) {
+        return res.status(400).json({ success: false, message: 'La modalidad de asistencia es obligatoria.' });
+      }
+
+      // 1. Verificamos si ya existe un registro de este usuario para esta actividad
+      const [existing] = await pool.execute(
         'SELECT * FROM activity_attendees WHERE activity_id = ? AND user_id = ?',
         [activityId, userId]
       );
 
-      if (attendee.length === 0) {
-        return res.status(404).json({ success: false, message: 'No estás inscrito en esta actividad.' });
+      if (existing.length > 0) {
+        // Si existe, lo actualizamos
+        await pool.execute(
+          'UPDATE activity_attendees SET status = ?, modality = ? WHERE activity_id = ? AND user_id = ?',
+          ['confirmed', modalidad, activityId, userId]
+        );
+      } else {
+        // Si no existe, lo creamos
+        await pool.execute(
+          'INSERT INTO activity_attendees (activity_id, user_id, status, modality) VALUES (?, ?, ?, ?)',
+          [activityId, userId, 'confirmed', modalidad]
+        );
       }
 
-      // Actualizar estado a confirmed
-      await pool.execute(
-        'UPDATE activity_attendees SET status = ? WHERE activity_id = ? AND user_id = ?',
-        ['confirmed', activityId, userId]
-      );
-
-      res.json({ success: true, message: 'Asistencia confirmada.' });
+      res.json({ success: true, message: `Asistencia ${modalidad} confirmada.` });
     } catch (error) {
       next(error);
     }
   },
-
+  
   /**
    * POST /api/activities/:activityId/enroll
    * Inscribir al usuario en una actividad disponible

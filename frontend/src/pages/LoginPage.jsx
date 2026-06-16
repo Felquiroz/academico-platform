@@ -80,9 +80,9 @@ export default function LoginPage() {
         <div className="login-demo">
           <p style={{ marginBottom: 8 }}><strong>Usuarios de prueba:</strong></p>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => fillDemo('admin')} type="button">Admin</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => fillDemo('coordinator')} type="button">Coordinador</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => fillDemo('user')} type="button">Usuario</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => fillDemo('admin')} type="button">Administrador</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => fillDemo('coordinator')} type="button">Profesor</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => fillDemo('user')} type="button">Alumno</button>
           </div>
         </div>
       </div>

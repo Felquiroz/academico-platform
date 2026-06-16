@@ -1,6 +1,7 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+console.log("Contraseña leída por Node:", process.env.DB_PASSWORD);
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT) || 3306,
@@ -14,6 +15,8 @@ const pool = mysql.createPool({
   timezone: '+00:00',
   dateStrings: true
 });
+
+console.log("Contraseña leída por Node:", process.env.DB_PASSWORD);
 
 console.log('🔍 DB Config:', {
   host: process.env.DB_HOST,
