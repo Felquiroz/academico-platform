@@ -61,6 +61,34 @@ class Program {
     return rows[0].total;
   }
 
+  static async enrollUsers(programId, userIds) {
+    if (!userIds || userIds.length === 0) return [];
+    const values = userIds.map(userId => `(${programId}, ${userId})`).join(',');
+    await pool.execute(
+      `INSERT IGNORE INTO program_enrollments (program_id, user_id) VALUES ${values}`
+    );
+    return this.getEnrolledUsers(programId);
+  }
+
+  static async getEnrolledUsers(programId) {
+    const [rows] = await pool.execute(`
+      SELECT u.id, u.name, u.email, pe.enrolled_at
+      FROM program_enrollments pe
+      JOIN users u ON u.id = pe.user_id
+      WHERE pe.program_id = ?
+      ORDER BY u.name
+    `, [programId]);
+    return rows;
+  }
+
+  static async removeEnrolledUser(programId, userId) {
+    await pool.execute(
+      'DELETE FROM program_enrollments WHERE program_id = ? AND user_id = ?',
+      [programId, userId]
+    );
+    return true;
+  }
+
   static async getStats(id) {
     const [rows] = await pool.execute(`
       SELECT 

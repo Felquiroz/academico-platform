@@ -19,6 +19,8 @@ import AuditPage from './pages/AuditPage';
 import UserStatsPage from './pages/UserStatsPage';
 import RequestsPage from './pages/RequestsPage';
 import MyRequestsPage from './pages/MyRequestsPage';
+import MenuConfirmationPage from './pages/MenuConfirmationPage';
+import AttendancePage from './pages/AttendancePage';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -44,17 +46,19 @@ function AppRoutes() {
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="my-activities" element={<MyActivitiesPage />} />
         <Route path="activities" element={<ActivitiesPage />} />
-        <Route path="enrollments" element={<ProtectedRoute roles={['admin', 'coordinator']}><EnrollmentsPage /></ProtectedRoute>} />
+        <Route path="enrollments" element={<ProtectedRoute roles={['admin', 'coordinator', 'teacher']}><EnrollmentsPage /></ProtectedRoute>} />
         <Route path="programs" element={<ProgramsPage />} />
         <Route path="rooms" element={<RoomsPage />} />
         <Route path="services" element={<ServicesPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
 
         {/* Rutas restringidas */}
-        <Route path="users" element={<ProtectedRoute roles={['admin', 'coordinator']}><UsersPage /></ProtectedRoute>} />
+        <Route path="users" element={<ProtectedRoute roles={['admin', 'coordinator', 'teacher']}><UsersPage /></ProtectedRoute>} />
         <Route path="user-stats" element={<ProtectedRoute roles={['admin', 'coordinator']}><UserStatsPage /></ProtectedRoute>} />
-        <Route path="requests" element={<ProtectedRoute roles={['admin', 'coordinator']}><RequestsPage /></ProtectedRoute>} />
+        <Route path="requests" element={<ProtectedRoute roles={['admin', 'coordinator', 'teacher']}><RequestsPage /></ProtectedRoute>} />
         <Route path="my-requests" element={<MyRequestsPage />} />
+        <Route path="menu-confirmation" element={<MenuConfirmationPage />} />
+        <Route path="attendance" element={<ProtectedRoute roles={['admin', 'coordinator', 'teacher']}><AttendancePage /></ProtectedRoute>} />
         <Route path="audit" element={<ProtectedRoute roles={['admin']}><AuditPage /></ProtectedRoute>} />
       </Route>
 

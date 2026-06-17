@@ -70,6 +70,38 @@ export default function ActivitiesPage() {
     } catch { toast.error('Error al exportar'); }
   };
 
+  const handleExportSemanal = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filterProgram) params.set('program_id', filterProgram);
+      const baseUrl = import.meta.env.VITE_API_URL || 'https://academico-platform.onrender.com/api';
+      const response = await fetch(`${baseUrl}/activities/export-semanal?${params}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
+      });
+      const result = await response.json();
+      if (result.success) {
+        const rows = [['Día', 'Hora', 'Actividad', 'Programa', 'Sala', 'Estado']];
+        Object.entries(result.data).forEach(([day, acts]) => {
+          acts.forEach(a => {
+            rows.push([
+              day,
+              `${new Date(a.start_time).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'})} - ${new Date(a.end_time).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'})}`,
+              a.title, a.program_name || '', a.room_name || '', a.status
+            ]);
+          });
+        });
+        const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'semanal.csv';
+        a.click();
+        toast.success('Semanal exportado');
+      }
+    } catch { toast.error('Error al exportar semanal'); }
+  };
+
   const handleAutoUpdateStatus = async () => {
     try {
       await put('/activities/update-status', {}, { silent: true });
@@ -144,6 +176,7 @@ export default function ActivitiesPage() {
         </div>
         {canManage() && <button className="btn btn-primary" onClick={openCreate} id="create-activity-btn"><HiOutlinePlus /> Nueva Actividad</button>}
         <button className="btn btn-secondary" onClick={handleExport} title="Exportar CSV"><HiOutlineDownload /> Exportar</button>
+        <button className="btn btn-secondary" onClick={handleExportSemanal} title="Exportar semana"><HiOutlineDownload /> Semanal</button>
         <button className="btn btn-secondary" onClick={handleAutoUpdateStatus} title="Actualizar estados"><HiOutlineRefresh /> Actualizar Estados</button>
       </div>
 

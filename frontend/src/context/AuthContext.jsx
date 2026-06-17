@@ -42,10 +42,12 @@ export function AuthProvider({ children }) {
 
   const isAdmin = () => user?.role === 'admin';
   const isCoordinator = () => user?.role === 'coordinator';
-  const canManage = () => user?.role === 'admin' || user?.role === 'coordinator';
+  const isTeacher = () => user?.role === 'teacher';
+  const isStudent = () => user?.role === 'student' || user?.role === 'user';
+  const canManage = () => user?.role === 'admin' || user?.role === 'coordinator' || user?.role === 'teacher';
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isCoordinator, canManage }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isCoordinator, isTeacher, isStudent, canManage }}>
       {children}
     </AuthContext.Provider>
   );

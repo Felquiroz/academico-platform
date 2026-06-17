@@ -1,11 +1,18 @@
 const pool = require('../config/db');
 
 class Request {
-  static async create({ type, title, description, requested_by, program_id, room_id, start_time, end_time, activity_id }) {
+  static async create({ type, title, description, requested_by, program_id, room_id, start_time, end_time, activity_id, service_ids }) {
+    const servicesJson = service_ids ? JSON.stringify(service_ids) : null;
+    const params = [
+      type, title, description, requested_by,
+      program_id || null, room_id || null,
+      start_time || null, end_time || null,
+      activity_id || null, servicesJson, 'pending'
+    ];
     const [result] = await pool.execute(
-      `INSERT INTO requests (type, title, description, requested_by, program_id, room_id, start_time, end_time, activity_id, status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [type, title, description, requested_by, program_id, room_id, start_time, end_time, activity_id, 'pending']
+      `INSERT INTO requests (type, title, description, requested_by, program_id, room_id, start_time, end_time, activity_id, service_ids, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params
     );
     return this.findById(result.insertId);
   }

@@ -90,6 +90,67 @@ class Service {
     `, [activityId]);
     return rows[0].total;
   }
+
+  // --- Menú Options ---
+
+  static async getMenuOptions(serviceId) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM service_menu_options WHERE service_id = ? ORDER BY option_name',
+      [serviceId]
+    );
+    return rows;
+  }
+
+  static async addMenuOption(serviceId, optionName) {
+    const [result] = await pool.execute(
+      'INSERT INTO service_menu_options (service_id, option_name) VALUES (?, ?)',
+      [serviceId, optionName]
+    );
+    return { id: result.insertId, service_id: serviceId, option_name: optionName };
+  }
+
+  static async removeMenuOption(optionId) {
+    const [result] = await pool.execute('DELETE FROM service_menu_options WHERE id = ?', [optionId]);
+    return result.affectedRows > 0;
+  }
+
+  // --- Student Menu Choices ---
+
+  static async saveMenuChoice(activityId, userId, serviceId, menuOptionId, customNotes = null) {
+    await pool.execute(
+      `INSERT INTO menu_choices (activity_id, user_id, service_id, menu_option_id, custom_notes)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE menu_option_id = VALUES(menu_option_id), custom_notes = VALUES(custom_notes)`,
+      [activityId, userId, serviceId, menuOptionId || null, customNotes]
+    );
+    return true;
+  }
+
+  static async getMenuChoicesForUser(activityId, userId) {
+    const [rows] = await pool.execute(`
+      SELECT mc.*, smo.option_name, s.name as service_name
+      FROM menu_choices mc
+      JOIN activity_services av ON av.activity_id = mc.activity_id AND av.service_id = mc.service_id
+      JOIN services s ON s.id = mc.service_id
+      LEFT JOIN service_menu_options smo ON smo.id = mc.menu_option_id
+      WHERE mc.activity_id = ? AND mc.user_id = ?
+    `, [activityId, userId]);
+    return rows;
+  }
+
+  static async getMenuChoicesForActivity(activityId) {
+    const [rows] = await pool.execute(`
+      SELECT mc.*, u.name as user_name, u.email as user_email,
+        smo.option_name, s.name as service_name
+      FROM menu_choices mc
+      JOIN users u ON u.id = mc.user_id
+      JOIN services s ON s.id = mc.service_id
+      LEFT JOIN service_menu_options smo ON smo.id = mc.menu_option_id
+      WHERE mc.activity_id = ?
+      ORDER BY s.name, u.name
+    `, [activityId]);
+    return rows;
+  }
 }
 
 module.exports = Service;

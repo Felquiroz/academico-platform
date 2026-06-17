@@ -109,19 +109,32 @@ class Activity {
   /**
    * Obtener actividades para el calendario (rango de fechas)
    */
-  static async getForCalendar(startDate, endDate) {
-    const [rows] = await pool.query(`
+  static async getForCalendar(startDate, endDate, role = null, userId = null, programIds = null) {
+    let query = `
       SELECT a.id, a.title, a.start_time, a.end_time, a.status,
         p.name as program_name, p.type as program_type,
-        r.name as room_name,
+        r.name as room_name, a.program_id, a.room_id, a.created_by,
         (SELECT COUNT(*) FROM activity_attendees WHERE activity_id = a.id) as registered_count
       FROM activities a
       LEFT JOIN programs p ON p.id = a.program_id
       LEFT JOIN rooms r ON r.id = a.room_id
       WHERE a.start_time >= ? AND a.end_time <= ?
         AND a.status != 'cancelled'
-      ORDER BY a.start_time ASC
-    `, [startDate, endDate]);
+    `;
+    const params = [startDate, endDate];
+
+    if (role === 'teacher' || role === 'coordinator') {
+      query += ' AND a.created_by = ?';
+      params.push(userId);
+    } else if (role === 'student' && programIds && programIds.length > 0) {
+      query += ' AND a.program_id IN (?)';
+      params.push(programIds);
+    } else if (role === 'student') {
+      query += ' AND 1=0'; // No enrolled programs → no results
+    }
+
+    query += ' ORDER BY a.start_time ASC';
+    const [rows] = await pool.query(query, params);
     return rows;
   }
 

@@ -39,7 +39,7 @@ const requestController = {
    */
   async create(req, res, next) {
     try {
-      const { type, title, description, program_id, room_id, start_time, end_time, activity_id } = req.body;
+      const { type, title, description, program_id, room_id, start_time, end_time, activity_id, service_ids } = req.body;
 
       if (!type || !title) {
         return res.status(400).json({ success: false, message: 'Tipo y título son obligatorios.' });
@@ -59,7 +59,7 @@ const requestController = {
 
       const request = await Request.create({
         type, title, description, requested_by: req.user.id,
-        program_id, room_id, start_time, end_time, activity_id
+        program_id, room_id, start_time, end_time, activity_id, service_ids
       });
 
       // Notificar a admins
@@ -96,11 +96,22 @@ const requestController = {
 
       // Si es solicitud de sala, crear la actividad
       if (request.type === 'room' && request.room_id) {
-        await pool.execute(
+        const [actResult] = await pool.execute(
           `INSERT INTO activities (title, description, program_id, room_id, created_by, start_time, end_time, status) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [request.title, request.description, request.program_id, request.room_id, req.user.id, request.start_time, request.end_time, 'scheduled']
         );
+
+        // Asignar servicios solicitados a la actividad
+        if (request.service_ids) {
+          const serviceIds = typeof request.service_ids === 'string' ? JSON.parse(request.service_ids) : request.service_ids;
+          if (Array.isArray(serviceIds) && serviceIds.length > 0) {
+            const values = serviceIds.map(sid => `(${actResult.insertId}, ${sid}, 1, NULL)`).join(',');
+            await pool.execute(
+              `INSERT INTO activity_services (activity_id, service_id, quantity, notes) VALUES ${values}`
+            );
+          }
+        }
       }
 
       // Notificar al solicitante

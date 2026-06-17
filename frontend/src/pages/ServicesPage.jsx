@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
-import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineMenu } from 'react-icons/hi';
 
 export default function ServicesPage() {
   const { get, post, put, del } = useApi();
@@ -11,6 +11,9 @@ export default function ServicesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', cost_per_person: '', provider: '' });
+  const [menuModal, setMenuModal] = useState(null);
+  const [menuOptions, setMenuOptions] = useState([]);
+  const [newOption, setNewOption] = useState('');
 
   useEffect(() => { fetchServices(); }, []);
   const fetchServices = async () => { try { const res = await get('/services', { silent: true }); setServices(res.data); } catch {} setLoading(false); };
@@ -28,6 +31,30 @@ export default function ServicesPage() {
   };
 
   const handleDelete = async (id) => { if (!confirm('¿Desactivar servicio?')) return; await del(`/services/${id}`, { successMessage: 'Servicio desactivado' }); fetchServices(); };
+
+  const openMenu = async (service) => {
+    setMenuModal(service);
+    setNewOption('');
+    try {
+      const res = await get(`/services/${service.id}/menu-options`, { silent: true });
+      setMenuOptions(res.data || []);
+    } catch { setMenuOptions([]); }
+  };
+
+  const addOption = async () => {
+    if (!newOption.trim()) return;
+    await post(`/services/${menuModal.id}/menu-options`, { option_name: newOption.trim() }, { successMessage: 'Opción agregada' });
+    setNewOption('');
+    const res = await get(`/services/${menuModal.id}/menu-options`, { silent: true });
+    setMenuOptions(res.data || []);
+  };
+
+  const removeOption = async (optionId) => {
+    if (!confirm('¿Eliminar opción?')) return;
+    await del(`/services/menu-options/${optionId}`, { successMessage: 'Opción eliminada' });
+    const res = await get(`/services/${menuModal.id}/menu-options`, { silent: true });
+    setMenuOptions(res.data || []);
+  };
 
   const formatCLP = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n);
 
@@ -54,12 +81,15 @@ export default function ServicesPage() {
             {canManage() && (
               <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--border-light)', paddingTop: 12 }}>
                 <button className="btn btn-secondary btn-sm" onClick={() => openEdit(s)}><HiOutlinePencil /> Editar</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => openMenu(s)}><HiOutlineMenu /> Menú</button>
                 <button className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(s.id)}><HiOutlineTrash /></button>
               </div>
             )}
           </div>
         ))}
       </div>
+
+      {/* Modal crear/editar servicio */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -73,6 +103,31 @@ export default function ServicesPage() {
               </div>
               <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button><button type="submit" className="btn btn-primary">{editingId ? 'Guardar' : 'Crear'}</button></div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal opciones de menú */}
+      {menuModal && (
+        <div className="modal-overlay" onClick={() => setMenuModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Opciones de menú: {menuModal.name}</h3>
+              <button className="btn btn-icon" onClick={() => setMenuModal(null)}>×</button>
+            </div>
+            <div style={{ padding: 'var(--space-md)' }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input className="form-input" value={newOption} onChange={e => setNewOption(e.target.value)} placeholder="Nueva opción..." />
+                <button className="btn btn-primary btn-sm" onClick={addOption}>+</button>
+              </div>
+              {menuOptions.map(opt => (
+                <div key={opt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-light)' }}>
+                  <span>{opt.option_name}</span>
+                  <button className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={() => removeOption(opt.id)}><HiOutlineTrash /></button>
+                </div>
+              ))}
+              {menuOptions.length === 0 && <p style={{ color: 'var(--text-muted)', textAlign: 'center' }}>Sin opciones aún</p>}
+            </div>
           </div>
         </div>
       )}

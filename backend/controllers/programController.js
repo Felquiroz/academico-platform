@@ -1,6 +1,5 @@
 const Program = require('../models/Program');
 const { logAudit } = require('../middleware/audit');
-const db = require('../config/db'); // NUEVO: Importa tu conexión a la base de datos (ajusta la ruta si es necesario)
 
 const programController = {
   async getAll(req, res, next) {
@@ -42,8 +41,7 @@ const programController = {
 
   async create(req, res, next) {
     try {
-      // NUEVO: Recibimos student_ids desde el req.body enviado por el frontend
-      const { name, description, type, start_date, end_date, student_ids } = req.body;
+      const { name, description, type, start_date, end_date, user_ids } = req.body;
 
       if (!name || !type || !start_date || !end_date) {
         return res.status(400).json({ success: false, message: 'Nombre, tipo, fecha inicio y fin son obligatorios.' });
@@ -53,31 +51,18 @@ const programController = {
         return res.status(400).json({ success: false, message: 'Tipo debe ser "diplomado" o "magister".' });
       }
 
-      // Se crea el programa en la tabla 'programas'
       const program = await Program.create({ name, description, type, start_date, end_date });
 
-      // === NUEVO: GUARDAR ALUMNOS EN LA TABLA INTERMEDIA ===
-      if (student_ids && student_ids.length > 0) {
-        // Formateamos los datos como pares [programa_id, alumno_id]
-        const valoresInscripcion = student_ids.map(alumno_id => [program.id, alumno_id]);
-        
-        const queryInscripciones = `
-          INSERT INTO inscripciones (programa_id, alumno_id) 
-          VALUES ?
-        `;
-        
-        // Inserción masiva en la tabla inscripciones
-        await db.query(queryInscripciones, [valoresInscripcion]);
+      if (user_ids && user_ids.length > 0) {
+        await Program.enrollUsers(program.id, user_ids);
       }
-      // ====================================================
 
       await logAudit({
         userId: req.user.id, action: 'CREATE', entityType: 'program',
-        entityId: program.id, newValues: { ...program, student_ids }, // NUEVO: Guardamos también los alumnos en la auditoría
-        ipAddress: req.ip
+        entityId: program.id, newValues: { ...program, user_ids }, ipAddress: req.ip
       });
 
-      res.status(201).json({ success: true, message: 'Programa creado con alumnos inscritos.', data: program });
+      res.status(201).json({ success: true, message: 'Programa creado.', data: program });
     } catch (error) {
       next(error);
     }
@@ -85,42 +70,60 @@ const programController = {
 
   async update(req, res, next) {
     try {
-      // 1. Extraemos student_ids para manejarlo por separado
-      const { student_ids, ...programData } = req.body;
-      const programaId = parseInt(req.params.id);
-
-      const old = await Program.findById(programaId);
+      const old = await Program.findById(req.params.id);
       if (!old) return res.status(404).json({ success: false, message: 'Programa no encontrado.' });
 
-      // 2. Actualizamos los datos básicos del programa (nombre, fechas, etc.)
-      // Usamos programData para no enviar el array de student_ids al modelo Program
-      const updated = await Program.update(programaId, programData);
-
-      // === NUEVO: ACTUALIZAR ALUMNOS EN LA TABLA INTERMEDIA ===
-      // Solo actualizamos si el frontend envió el campo student_ids
-      if (student_ids !== undefined) {
-        
-        // A. Limpiamos las inscripciones anteriores de este programa específico
-        await db.query('DELETE FROM inscripciones WHERE programa_id = ?', [programaId]);
-        
-        // B. Si la nueva lista trae alumnos, los insertamos todos de golpe
-        if (student_ids.length > 0) {
-          const valoresInscripcion = student_ids.map(alumno_id => [programaId, alumno_id]);
-          const queryInscripciones = `
-            INSERT INTO inscripciones (programa_id, alumno_id) 
-            VALUES ?
-          `;
-          await db.query(queryInscripciones, [valoresInscripcion]);
-        }
-      }
-      // ========================================================
+      const updated = await Program.update(req.params.id, req.body);
 
       await logAudit({
         userId: req.user.id, action: 'UPDATE', entityType: 'program',
-        entityId: programaId, oldValues: old, newValues: { ...updated, student_ids }, ipAddress: req.ip
+        entityId: parseInt(req.params.id), oldValues: old, newValues: updated, ipAddress: req.ip
       });
 
-      res.json({ success: true, message: 'Programa y alumnos actualizados.', data: updated });
+      res.json({ success: true, message: 'Programa actualizado.', data: updated });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getEnrollments(req, res, next) {
+    try {
+      const program = await Program.findById(req.params.id);
+      if (!program) return res.status(404).json({ success: false, message: 'Programa no encontrado.' });
+      const users = await Program.getEnrolledUsers(req.params.id);
+      res.json({ success: true, data: users });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async enrollUsers(req, res, next) {
+    try {
+      const program = await Program.findById(req.params.id);
+      if (!program) return res.status(404).json({ success: false, message: 'Programa no encontrado.' });
+      const { user_ids } = req.body;
+      if (!user_ids || !Array.isArray(user_ids)) {
+        return res.status(400).json({ success: false, message: 'user_ids es requerido.' });
+      }
+      const users = await Program.enrollUsers(req.params.id, user_ids);
+      await logAudit({
+        userId: req.user.id, action: 'BULK_REGISTER', entityType: 'program_enrollment',
+        entityId: parseInt(req.params.id), newValues: { user_ids }, ipAddress: req.ip
+      });
+      res.json({ success: true, message: `${user_ids.length} usuarios inscritos al programa.`, data: users });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async removeEnrolledUser(req, res, next) {
+    try {
+      await Program.removeEnrolledUser(req.params.id, req.params.userId);
+      await logAudit({
+        userId: req.user.id, action: 'DELETE', entityType: 'program_enrollment',
+        entityId: parseInt(req.params.id), oldValues: { user_id: parseInt(req.params.userId) }, ipAddress: req.ip
+      });
+      res.json({ success: true, message: 'Usuario eliminado del programa.' });
     } catch (error) {
       next(error);
     }

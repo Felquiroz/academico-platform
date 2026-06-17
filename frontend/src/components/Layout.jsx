@@ -80,14 +80,16 @@ export default function Layout() {
         { section: 'Principal', items: [
           { to: '/', icon: <HiOutlineHome />, label: 'Dashboard' },
           { to: '/calendar', icon: <HiOutlineCalendar />, label: 'Calendario' },
-          //{ to: '/my-activities', icon: <HiOutlineClipboardList />, label: 'Mis Actividades' },
+          { to: '/my-activities', icon: <HiOutlineClipboardList />, label: 'Mis Actividades' },
           { to: '/activities', icon: <HiOutlineClipboardList />, label: 'Gestión Actividades' },
           { to: '/my-requests', icon: <HiOutlineClipboardList />, label: 'Mis Solicitudes' },
+          { to: '/attendance', icon: <HiOutlineClipboardList />, label: 'Asistencia' },
         ]},
         { section: 'Gestión', items: [
           { to: '/programs', icon: <HiOutlineAcademicCap />, label: 'Programas' },
           { to: '/rooms', icon: <HiOutlineOfficeBuilding />, label: 'Salas' },
           { to: '/services', icon: <HiOutlineCog />, label: 'Servicios' },
+          { to: '/menu-confirmation', icon: <HiOutlineCog />, label: 'Menús Alumnos' },
           { to: '/requests', icon: <HiOutlineClipboardList />, label: 'Solicitudes' },
           { to: '/enrollments', icon: <HiOutlineUsers />, label: 'Inscripciones' },
           { to: '/user-stats', icon: <HiOutlineSearch />, label: 'Estadísticas Users' },
@@ -103,11 +105,12 @@ export default function Layout() {
           { to: '/', icon: <HiOutlineHome />, label: 'Mi Dashboard' },
           { to: '/my-activities', icon: <HiOutlineCalendar />, label: 'Mis Clases' },
           { to: '/calendar', icon: <HiOutlineCalendar />, label: 'Calendario' },
-         // { to: '/my-requests', icon: <HiOutlineClipboardList />, label: 'Solicitudes' },
+          { to: '/my-requests', icon: <HiOutlineClipboardList />, label: 'Solicitudes' },
+          { to: '/menu-confirmation', icon: <HiOutlineCog />, label: 'Confirmar Menú' },
         ]},
-        //{ section: 'Sistema', items: [
-          //{ to: '/notifications', icon: <HiOutlineBell />, label: 'Notificaciones', badge: unreadCount },
-        //]},
+        { section: 'Sistema', items: [
+          { to: '/notifications', icon: <HiOutlineBell />, label: 'Notificaciones', badge: unreadCount },
+        ]},
       ];
 
   return (

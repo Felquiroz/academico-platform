@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(100) NOT NULL,
   email VARCHAR(150) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin', 'coordinator', 'user') NOT NULL DEFAULT 'user',
+  role ENUM('admin', 'coordinator', 'teacher', 'user', 'student') NOT NULL DEFAULT 'student',
   active BOOLEAN NOT NULL DEFAULT TRUE,
   phone VARCHAR(20) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -109,9 +109,40 @@ CREATE TABLE IF NOT EXISTS services (
   description TEXT DEFAULT NULL,
   cost_per_person DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
   provider VARCHAR(150) DEFAULT NULL,
+  has_menu_options BOOLEAN NOT NULL DEFAULT FALSE,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ============================================
+-- TABLA: service_menu_options
+-- ============================================
+CREATE TABLE IF NOT EXISTS service_menu_options (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  service_id INT NOT NULL,
+  option_name VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_menu_opts_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE,
+  INDEX idx_menu_opts_service (service_id)
+) ENGINE=InnoDB;
+
+-- ============================================
+-- TABLA: menu_choices
+-- ============================================
+CREATE TABLE IF NOT EXISTS menu_choices (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  activity_id INT NOT NULL,
+  user_id INT NOT NULL,
+  service_id INT NOT NULL,
+  menu_option_id INT DEFAULT NULL,
+  custom_notes TEXT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_menu_choices_activity FOREIGN KEY (activity_id) REFERENCES activities(id) ON DELETE CASCADE,
+  CONSTRAINT fk_menu_choices_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_menu_choices_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE,
+  CONSTRAINT fk_menu_choices_option FOREIGN KEY (menu_option_id) REFERENCES service_menu_options(id) ON DELETE SET NULL,
+  UNIQUE KEY uk_activity_user_service (activity_id, user_id, service_id)
 ) ENGINE=InnoDB;
 
 -- ============================================
@@ -211,6 +242,19 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 ) ENGINE=InnoDB;
 
 -- ============================================
+-- TABLA: program_enrollments
+-- ============================================
+CREATE TABLE IF NOT EXISTS program_enrollments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  program_id INT NOT NULL,
+  user_id INT NOT NULL,
+  enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_prenroll_program FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_prenroll_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uk_program_user (program_id, user_id)
+) ENGINE=InnoDB;
+
+-- ============================================
 -- TABLA: requests
 -- ============================================
 CREATE TABLE IF NOT EXISTS requests (
@@ -222,6 +266,7 @@ CREATE TABLE IF NOT EXISTS requests (
   program_id INT DEFAULT NULL,
   room_id INT DEFAULT NULL,
   activity_id INT DEFAULT NULL,
+  service_ids JSON DEFAULT NULL,
   start_time DATETIME DEFAULT NULL,
   end_time DATETIME DEFAULT NULL,
   status ENUM('pending', 'approved', 'rejected', 'cancelled') NOT NULL DEFAULT 'pending',

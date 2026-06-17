@@ -30,10 +30,15 @@ const authController = {
         return res.status(409).json({ success: false, message: 'El email ya está registrado.' });
       }
 
-      // Solo admins pueden crear otros admins o coordinadores
-      let assignedRole = 'user';
-      if (role && req.user && req.user.role === 'admin') {
-        assignedRole = role;
+      // Solo admins pueden crear admins, coordinadores o profesores
+      const validRoles = ['student', 'user', 'teacher', 'coordinator', 'admin'];
+      let assignedRole = 'student';
+      if (role && validRoles.includes(role)) {
+        if (req.user.role === 'admin') {
+          assignedRole = role;
+        } else if (role === 'student' || role === 'user') {
+          assignedRole = role;
+        }
       }
 
       const user = await User.create({ name, email, password: finalPassword, role: assignedRole, phone });

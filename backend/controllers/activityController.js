@@ -94,6 +94,61 @@ const activityController = {
       next(error);
     }
   },
+
+  /**
+   * GET /api/activities/export-semanal
+   */
+  async exportSemanal(req, res, next) {
+    try {
+      const { program_id, week_start } = req.query;
+      let startDate, endDate;
+
+      if (week_start) {
+        const ws = new Date(week_start);
+        startDate = ws.toISOString();
+        endDate = new Date(ws.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      } else {
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+        monday.setHours(0, 0, 0, 0);
+        startDate = monday.toISOString();
+        endDate = new Date(monday.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      let query = `
+        SELECT a.*, p.name as program_name, p.type as program_type,
+          r.name as room_name, u.name as creator_name
+        FROM activities a
+        LEFT JOIN programs p ON p.id = a.program_id
+        LEFT JOIN rooms r ON r.id = a.room_id
+        LEFT JOIN users u ON u.id = a.created_by
+        WHERE a.start_time >= ? AND a.end_time < ?
+          AND a.status != 'cancelled'
+      `;
+      const params = [startDate, endDate];
+
+      if (program_id) { query += ' AND a.program_id = ?'; params.push(program_id); }
+
+      query += ' ORDER BY a.start_time ASC';
+
+      const [rows] = await pool.query(query, params);
+
+      // Agrupar por día
+      const grouped = {};
+      rows.forEach(row => {
+        const day = new Date(row.start_time).toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        if (!grouped[day]) grouped[day] = [];
+        grouped[day].push(row);
+      });
+
+      res.json({ success: true, data: grouped, total: rows.length, week: { start: startDate, end: endDate } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async getAll(req, res, next) {
     try {
       const { program_id, room_id, status, start_date, end_date, search, limit, offset } = req.query;
@@ -134,12 +189,15 @@ const activityController = {
         return res.status(400).json({ success: false, message: 'La fecha de inicio debe ser anterior a la fecha de fin.' });
       }
 
-      // Detectar conflictos de sala ANTES de crear
-      let warnings = [];
+      // Bloquear si hay conflicto de sala
       if (room_id) {
         const roomConflicts = await Activity.findConflicts(room_id, start_time, end_time);
         if (roomConflicts.length > 0) {
-          warnings = roomConflicts.map(c => `Conflicto con "${c.title}" (${c.start_time} - ${c.end_time})`);
+          const conflict = roomConflicts[0];
+          return res.status(409).json({
+            success: false,
+            message: `La sala ya está ocupada. Conflicto con "${conflict.title}" (${new Date(conflict.start_time).toLocaleString()} - ${new Date(conflict.end_time).toLocaleString()})`
+          });
         }
       }
 
@@ -147,6 +205,18 @@ const activityController = {
         title, description, program_id, room_id,
         created_by: req.user.id, start_time, end_time, estimated_attendees
       });
+
+      // Auto-inscribir a los alumnos del programa en esta actividad
+      const [enrolledUsers] = await pool.execute(
+        'SELECT user_id FROM program_enrollments WHERE program_id = ?',
+        [program_id]
+      );
+      if (enrolledUsers.length > 0) {
+        const values = enrolledUsers.map(e => `(${activity.id}, ${e.user_id}, 'registered', NOW())`).join(',');
+        await pool.execute(
+          `INSERT IGNORE INTO activity_attendees (activity_id, user_id, status, registered_at) VALUES ${values}`
+        );
+      }
 
       // Detectar y registrar conflictos
       if (room_id) {
@@ -192,7 +262,6 @@ const activityController = {
         success: true,
         message: 'Actividad creada.',
         data: activity,
-        warnings: warnings.length > 0 ? warnings : undefined,
         estimation,
         room_suggestions: roomSuggestions
       });
@@ -267,7 +336,20 @@ const activityController = {
       if (!start || !end) {
         return res.status(400).json({ success: false, message: 'start y end son obligatorios.' });
       }
-      const activities = await Activity.getForCalendar(start, end);
+      const role = req.user.role;
+      const userId = req.user.id;
+
+      // Admin ve todo, teacher/coordinator ve sus actividades, student ve actividades de sus programas
+      let filterUserIds = null;
+      if (role === 'student') {
+        const [enrollments] = await pool.execute(
+          'SELECT DISTINCT program_id FROM program_enrollments WHERE user_id = ?',
+          [userId]
+        );
+        filterUserIds = enrollments.map(e => e.program_id);
+      }
+
+      const activities = await Activity.getForCalendar(start, end, role, userId, filterUserIds);
       res.json({ success: true, data: activities });
     } catch (error) {
       next(error);
@@ -301,27 +383,53 @@ const activityController = {
   async getMyActivities(req, res, next) {
     try {
       const userId = req.user.id;
+      const userRole = req.user.role;
       
-      // Consultamos las clases de los programas donde el alumno está inscrito.
-      // Usamos LEFT JOIN con activity_attendees solo para saber si ya confirmó asistencia.
-      // Si no hay registro en activity_attendees, asumimos que su estado es 'registered' por defecto.
-      // La consulta corregida y verificada
-      const [rows] = await pool.query(`
-        SELECT a.*, p.name as program_name, p.type as program_type,
-          r.name as room_name, r.capacity as room_capacity,
-          COALESCE(aa.status, 'registered') as attendance_status,
-          aa.modality
-        FROM activities a
-        JOIN programs p ON a.program_id = p.id
-        JOIN inscripciones i ON a.program_id = i.programa_id
-        JOIN alumnos al ON i.alumno_id = al.id
-        LEFT JOIN rooms r ON a.room_id = r.id
-        LEFT JOIN activity_attendees aa ON aa.activity_id = a.id AND aa.user_id = ?
-        WHERE al.usuario_id = ? AND a.status != 'cancelled'
-        ORDER BY a.start_time ASC
-      `, [userId, userId])
+      // Para coordinadores/profesores: mostrar actividades que crearon
+      if (userRole === 'coordinator' || userRole === 'teacher' || userRole === 'admin') {
+        const [rows] = await pool.query(`
+          SELECT a.*, p.name as program_name, p.type as program_type,
+            r.name as room_name, r.capacity as room_capacity,
+            'registered' as attendance_status
+          FROM activities a
+          LEFT JOIN programs p ON p.id = a.program_id
+          LEFT JOIN rooms r ON r.id = a.room_id
+          WHERE a.created_by = ? AND a.status != 'cancelled'
+          ORDER BY a.start_time ASC
+        `, [userId]);
+        return res.json({ success: true, data: rows, type: 'enrolled' });
+      }
+      
+      // Primero verificar si tiene inscripciones en programas
+      const [programEnrollments] = await pool.execute(
+        'SELECT program_id FROM program_enrollments WHERE user_id = ?',
+        [userId]
+      );
 
-      if (rows.length > 0) {
+      // También verificar inscripciones directas a actividades
+      const [activityEnrollments] = await pool.execute(
+        'SELECT DISTINCT program_id FROM activity_attendees aa JOIN activities a ON a.id = aa.activity_id WHERE aa.user_id = ?',
+        [userId]
+      );
+
+      const programIds = [
+        ...programEnrollments.map(e => e.program_id),
+        ...activityEnrollments.map(e => e.program_id)
+      ];
+
+      if (programIds.length > 0) {
+        const uniqueIds = [...new Set(programIds)];
+        const [rows] = await pool.query(`
+          SELECT a.*, p.name as program_name, p.type as program_type,
+            r.name as room_name, r.capacity as room_capacity,
+            COALESCE(aa.status, 'available') as attendance_status
+          FROM activities a
+          LEFT JOIN programs p ON p.id = a.program_id
+          LEFT JOIN rooms r ON r.id = a.room_id
+          LEFT JOIN activity_attendees aa ON aa.activity_id = a.id AND aa.user_id = ?
+          WHERE a.program_id IN (?) AND a.status != 'cancelled'
+          ORDER BY a.start_time ASC
+        `, [userId, uniqueIds]);
         return res.json({ success: true, data: rows, type: 'enrolled' });
       }
 
@@ -332,6 +440,46 @@ const activityController = {
   },
   
   /**
+   * GET /api/activities/my-activities/with-services
+   * Obtiene actividades del estudiante con servicios asignados
+   */
+  async getMyActivitiesWithServices(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const [rows] = await pool.query(`
+        SELECT a.*, p.name as program_name, p.type as program_type,
+          r.name as room_name, r.capacity as room_capacity,
+          COALESCE(aa.status, 'registered') as attendance_status,
+          (SELECT JSON_ARRAYAGG(JSON_OBJECT('service_id', av.service_id, 'service_name', s.name, 'quantity', av.quantity))
+           FROM activity_services av JOIN services s ON s.id = av.service_id WHERE av.activity_id = a.id
+          ) as _services
+        FROM activities a
+        LEFT JOIN programs p ON p.id = a.program_id
+        LEFT JOIN rooms r ON r.id = a.room_id
+        LEFT JOIN activity_attendees aa ON aa.activity_id = a.id AND aa.user_id = ?
+        WHERE a.id IN (
+          SELECT activity_id FROM activity_services
+        )
+        AND a.program_id IN (
+          SELECT program_id FROM program_enrollments WHERE user_id = ?
+        )
+        AND a.status = 'scheduled'
+        AND a.start_time > NOW()
+        ORDER BY a.start_time ASC
+      `, [userId, userId]);
+      rows.forEach(r => {
+        if (typeof r._services === 'string') {
+          try { r._services = JSON.parse(r._services); } catch { r._services = []; }
+        }
+        if (!r._services) r._services = [];
+      });
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
    * GET /api/activities/my-programs
    * Obtiene los programas en los que está inscrito el alumno
    */
@@ -339,14 +487,15 @@ const activityController = {
     try {
       const userId = req.user.id;
 
-      // Buscamos los programas cruzando usuarios -> alumnos -> inscripciones
+      // Programas donde el usuario está inscrito (desde program_enrollments o activity_attendees)
       const [enrolled] = await pool.query(`
         SELECT p.*, 'enrolled' as enrollment_status
         FROM programs p
-        JOIN inscripciones i ON i.programa_id = p.id
-        JOIN alumnos al ON al.id = i.alumno_id
-        WHERE al.usuario_id = ? AND p.active = TRUE
-      `, [userId]);
+        LEFT JOIN program_enrollments pe ON pe.program_id = p.id AND pe.user_id = ?
+        LEFT JOIN activity_attendees aa ON aa.activity_id IN (SELECT id FROM activities WHERE program_id = p.id) AND aa.user_id = ?
+        WHERE (pe.id IS NOT NULL OR aa.id IS NOT NULL) AND p.active = TRUE
+        ORDER BY p.start_date DESC
+      `, [userId, userId]);
 
       res.json({ success: true, data: { enrolled, available: [] } });
     } catch (error) {
@@ -464,6 +613,18 @@ const activityController = {
           end_time: currentEnd.toISOString().slice(0, 19).replace('T', ' '),
           estimated_attendees
         });
+
+        // Auto-inscribir alumnos del programa
+        const [enrolled] = await pool.execute(
+          'SELECT user_id FROM program_enrollments WHERE program_id = ?', [program_id]
+        );
+        if (enrolled.length > 0) {
+          const values = enrolled.map(e => `(${activity.id}, ${e.user_id}, 'registered', NOW())`).join(',');
+          await pool.execute(
+            `INSERT IGNORE INTO activity_attendees (activity_id, user_id, status, registered_at) VALUES ${values}`
+          );
+        }
+
         activities.push(activity);
 
         // Agregar los días de repetición

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import { useRefresh } from '../context/RefreshContext';
-import { HiOutlinePlus, HiOutlineClock, HiOutlineOfficeBuilding } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlineClock, HiOutlineOfficeBuilding, HiOutlineCog } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 export default function MyRequestsPage() {
@@ -12,22 +12,25 @@ export default function MyRequestsPage() {
   const [requests, setRequests] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [programs, setPrograms] = useState([]);
+  const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ type: 'room', title: '', description: '', room_id: '', program_id: '', start_time: '', end_time: '' });
+  const [form, setForm] = useState({ type: 'room', title: '', description: '', room_id: '', program_id: '', start_time: '', end_time: '', service_ids: [] });
 
   useEffect(() => { fetchData(); }, [triggerRefresh]);
 
   const fetchData = async () => {
     try {
-      const [reqRes, roomRes, progRes] = await Promise.all([
+      const [reqRes, roomRes, progRes, servRes] = await Promise.all([
         get('/requests/my', { silent: true }),
         get('/rooms', { silent: true }),
-        get('/programs', { silent: true })
+        get('/programs', { silent: true }),
+        get('/services', { silent: true })
       ]);
       setRequests(reqRes.data.data || reqRes.data);
       setRooms(roomRes.data?.data || roomRes.data || []);
       setPrograms(progRes.data?.data || progRes.data || []);
+      setServices(servRes.data?.data || servRes.data || []);
     } catch {}
     setLoading(false);
   };
@@ -37,9 +40,18 @@ export default function MyRequestsPage() {
     try {
       await post('/requests', form, { successMessage: 'Solicitud enviada al administrador' });
       setShowModal(false);
-      setForm({ type: 'room', title: '', description: '', room_id: '', program_id: '', start_time: '', end_time: '' });
+      setForm({ type: 'room', title: '', description: '', room_id: '', program_id: '', start_time: '', end_time: '', service_ids: [] });
       triggerRefresh();
     } catch {}
+  };
+
+  const toggleService = (serviceId) => {
+    setForm(prev => ({
+      ...prev,
+      service_ids: prev.service_ids.includes(serviceId)
+        ? prev.service_ids.filter(id => id !== serviceId)
+        : [...prev.service_ids, serviceId]
+    }));
   };
 
   const statusInfo = (status) => ({
@@ -58,7 +70,7 @@ export default function MyRequestsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Mis Solicitudes</h1>
-          <p className="page-subtitle">Solicita salas y recursos al administrador</p>
+          <p className="page-subtitle">Solicita salas, servicios y recursos al administrador</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <HiOutlinePlus /> Nueva Solicitud
@@ -80,6 +92,7 @@ export default function MyRequestsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {requests.map(req => {
             const info = statusInfo(req.status);
+            const reqServices = req.service_ids ? (Array.isArray(req.service_ids) ? req.service_ids : JSON.parse(req.service_ids)) : [];
             return (
               <div key={req.id} className="card" style={{ padding: 16, borderLeft: `4px solid ${info.color}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -93,6 +106,11 @@ export default function MyRequestsPage() {
                       {req.room_name && <span>Sala: {req.room_name} • </span>}
                       {req.start_time && <span>{new Date(req.start_time).toLocaleString('es-CL')}</span>}
                     </div>
+                    {reqServices.length > 0 && (
+                      <div style={{ fontSize: '0.8rem', marginTop: 4, color: 'var(--text-secondary)' }}>
+                        <HiOutlineCog style={{ display: 'inline', verticalAlign: 'middle' }} /> Servicios solicitados: {reqServices.length}
+                      </div>
+                    )}
                     {req.notes && <div style={{ fontSize: '0.8rem', marginTop: 4, color: 'var(--text-secondary)' }}>Nota: {req.notes}</div>}
                   </div>
                 </div>
@@ -116,8 +134,9 @@ export default function MyRequestsPage() {
               <div className="form-group">
                 <label className="form-label">Tipo</label>
                 <select className="form-select" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-                  <option value="room">Solicitar Sala</option>
+                  <option value="room">Solicitar Sala + Servicios</option>
                   <option value="activity">Nueva Actividad</option>
+                  <option value="service">Solicitar Servicio</option>
                   <option value="general">Otro</option>
                 </select>
               </div>
@@ -157,7 +176,33 @@ export default function MyRequestsPage() {
                       <input className="form-input" type="datetime-local" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} />
                     </div>
                   </div>
+                  <div className="form-group">
+                    <label className="form-label">Servicios Adicionales</label>
+                    <div style={{ maxHeight: 150, overflow: 'auto', border: '1px solid var(--border-color)', borderRadius: 8, padding: 8 }}>
+                      {services.filter(s => s.active).map(s => (
+                        <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
+                          <input type="checkbox" checked={form.service_ids.includes(s.id)} onChange={() => toggleService(s.id)} style={{ accentColor: 'var(--accent-primary)' }} />
+                          {s.name} (${s.cost_per_person}/pers)
+                        </label>
+                      ))}
+                      {services.filter(s => s.active).length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No hay servicios disponibles</div>}
+                    </div>
+                  </div>
                 </>
+              )}
+              {(form.type === 'service') && (
+                <div className="form-group">
+                  <label className="form-label">Servicios Solicitados</label>
+                  <div style={{ maxHeight: 200, overflow: 'auto', border: '1px solid var(--border-color)', borderRadius: 8, padding: 8 }}>
+                    {services.filter(s => s.active).map(s => (
+                      <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
+                        <input type="checkbox" checked={form.service_ids.includes(s.id)} onChange={() => toggleService(s.id)} style={{ accentColor: 'var(--accent-primary)' }} />
+                        {s.name} - ${s.cost_per_person}/pers
+                      </label>
+                    ))}
+                    {services.filter(s => s.active).length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No hay servicios disponibles</div>}
+                  </div>
+                </div>
               )}
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>

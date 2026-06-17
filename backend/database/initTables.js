@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(100) NOT NULL,
   email VARCHAR(150) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin', 'coordinator', 'user') NOT NULL DEFAULT 'user',
+  role ENUM('admin', 'coordinator', 'teacher', 'user', 'student') NOT NULL DEFAULT 'student',
   active BOOLEAN NOT NULL DEFAULT TRUE,
   phone VARCHAR(20) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS services (
   description TEXT DEFAULT NULL,
   cost_per_person DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
   provider VARCHAR(150) DEFAULT NULL,
+  has_menu_options BOOLEAN NOT NULL DEFAULT FALSE,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -91,6 +92,24 @@ CREATE TABLE IF NOT EXISTS activity_services (
   quantity INT NOT NULL DEFAULT 1,
   notes TEXT DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS service_menu_options (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  service_id INT NOT NULL,
+  option_name VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS menu_choices (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  activity_id INT NOT NULL,
+  user_id INT NOT NULL,
+  service_id INT NOT NULL,
+  menu_option_id INT DEFAULT NULL,
+  custom_notes TEXT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_activity_user_service (activity_id, user_id, service_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS schedule_conflicts (
@@ -144,6 +163,14 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS program_enrollments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  program_id INT NOT NULL,
+  user_id INT NOT NULL,
+  enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_program_user (program_id, user_id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS requests (
   id INT AUTO_INCREMENT PRIMARY KEY,
   type ENUM('room', 'activity', 'service', 'general') NOT NULL,
@@ -153,6 +180,7 @@ CREATE TABLE IF NOT EXISTS requests (
   program_id INT DEFAULT NULL,
   room_id INT DEFAULT NULL,
   activity_id INT DEFAULT NULL,
+  service_ids JSON DEFAULT NULL,
   start_time DATETIME DEFAULT NULL,
   end_time DATETIME DEFAULT NULL,
   status ENUM('pending', 'approved', 'rejected', 'cancelled') NOT NULL DEFAULT 'pending',

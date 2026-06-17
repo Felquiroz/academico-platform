@@ -7,7 +7,7 @@ const authorize = require('../middleware/authorize');
 router.use(authenticate);
 
 // Todas las solicitudes (admin/coordinador)
-router.get('/', authorize('admin', 'coordinator'), requestController.getAll);
+router.get('/', authorize('admin', 'coordinator', 'teacher'), requestController.getAll);
 
 // Mis solicitudes
 router.get('/my', requestController.getMyRequests);
