@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRefresh } from '../context/RefreshContext';
 import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineSearch, HiOutlineLightBulb, HiOutlineUserGroup, HiOutlineDownload, HiOutlineRefresh } from 'react-icons/hi';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 export default function ActivitiesPage() {
   const { get, post, put, del } = useApi();
@@ -50,57 +51,120 @@ export default function ActivitiesPage() {
     setShowModal(true);
   };
 
-  const handleExport = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (filterProgram) params.set('program_id', filterProgram);
-      if (filterStatus) params.set('status', filterStatus);
-      
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://academico-platform.onrender.com/api'}/activities/export?format=csv&${params}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
-      });
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'actividades.csv';
-      a.click();
-      toast.success('Archivo exportado');
-    } catch { toast.error('Error al exportar'); }
-  };
 
-  const handleExportSemanal = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (filterProgram) params.set('program_id', filterProgram);
-      const baseUrl = import.meta.env.VITE_API_URL || 'https://academico-platform.onrender.com/api';
-      const response = await fetch(`${baseUrl}/activities/export-semanal?${params}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
+const handleExport = () => {
+  try {
+    // 1. Usamos el estado "activities" que tu tabla ya tiene cargado en pantalla
+    if (!activities || activities.length === 0) {
+      toast.error('No hay datos disponibles para exportar');
+      return;
+    }
+
+    // 2. Mapeamos directamente al formato limpio que pediste
+    const formattedData = activities.map(a => {
+      const startDate = a.start_time ? new Date(a.start_time) : null;
+      const endDate = a.end_time ? new Date(a.end_time) : null;
+      
+      return {
+        'Nombre de la Actividad': a.title || 'Sin título',
+        'Programa': a.program?.name || a.program_name || 'No asignado',
+        // Intentamos obtener el profesor desde el objeto relacional
+        'Profesor': a.teacher?.name || a.professor || a.teacher_name || 'No asignado',
+        'Sala': a.room?.name || a.room_name || 'Sin sala',
+        'Fecha': startDate ? startDate.toLocaleDateString('es-CL') : 'Sin fecha',
+        'Horario': startDate && endDate 
+          ? `${startDate.toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'})} - ${endDate.toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'})}`
+          : 'Sin horario',
+        // Intentamos capturar el total de asistentes
+        'Total Asistentes': Number(a.actual_attendees || a.estimated_attendees || 0)
+      };
+    });
+
+    // 3. Crear y descargar el archivo Excel real (.xlsx)
+    const worksheet = XLSX.utils.json_to_sheet(formattedData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Actividades");
+    
+    XLSX.writeFile(workbook, 'actividades_programadas.xlsx');
+    toast.success('Archivo Excel exportado correctamente');
+  } catch (error) { 
+    console.error(error);
+    toast.error('Error al procesar el archivo Excel'); 
+  }
+};
+
+const handleExportSemanal = async () => {
+  try {
+    // 1. Consultamos al backend por el reporte semanal (puedes pasarle filtros si usas estados de fechas)
+    // Usamos el 'get' que tienes configurado en tu app
+    toast.loading('Generando reporte semanal...', { id: 'report-loading' });
+    
+    const res = await get(`/activities/export-semanal?_t=${Date.now()}`, { silent: true });
+    
+    toast.dismiss('report-loading');
+
+    // 2. Extraemos la lista plana 'rawRows' que añadimos en tu controlador
+    const dataList = res?.rawRows || res?.data?.rawRows || [];
+
+    // Si de verdad viene vacío desde el servidor, alertamos
+    if (!dataList || dataList.length === 0) {
+      toast.error('No se encontraron actividades agendadas para esta semana');
+      return;
+    }
+
+    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const rows = [];
+
+    // 3. Mapeamos los datos con las nuevas columnas solicitadas
+    dataList.forEach(a => {
+      if (!a.start_time) return;
+      const startDate = new Date(a.start_time);
+      const endDate = a.end_time ? new Date(a.end_time) : null;
+      
+      const nombreDia = diasSemana[startDate.getDay()];
+
+      // Formatear Fecha a DD-MM-AAAA
+      const dia = String(startDate.getDate()).padStart(2, '0');
+      const mes = String(startDate.getMonth() + 1).padStart(2, '0');
+      const anio = startDate.getFullYear();
+      const fechaFormateada = `${dia}-${mes}-${anio}`;
+
+      rows.push({
+        'Día': nombreDia,
+        'Fecha (DD-MM-AAAA)': fechaFormateada,
+        'Horario': endDate 
+          ? `${startDate.toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'})} - ${endDate.toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'})}`
+          : startDate.toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'}),
+        'Actividad': a.title || 'Sin título',
+        'Programa': a.program_name || 'No asignado',
+        'Profesor': a.creator_name || 'No asignado', 
+        'Sala': a.room_name || 'Sin sala',
+        'Asistentes Presenciales': a.attendees_presencial || 0, 
+        'Asistentes Remotos': a.attendees_remoto || 0,         
+        'Total Menús por Tipo': a.menu_summary || 'Sin menús solicitados' 
       });
-      const result = await response.json();
-      if (result.success) {
-        const rows = [['Día', 'Hora', 'Actividad', 'Programa', 'Sala', 'Estado']];
-        Object.entries(result.data).forEach(([day, acts]) => {
-          acts.forEach(a => {
-            rows.push([
-              day,
-              `${new Date(a.start_time).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'})} - ${new Date(a.end_time).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'})}`,
-              a.title, a.program_name || '', a.room_name || '', a.status
-            ]);
-          });
-        });
-        const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'semanal.csv';
-        a.click();
-        toast.success('Semanal exportado');
-      }
-    } catch { toast.error('Error al exportar semanal'); }
-  };
+    });
+
+    // 4. CORRECCIÓN AQUÍ: Creamos el nombre del archivo usando la fecha actual o la primera del reporte
+    const tora = new Date();
+    const nombreFecha = `${String(tora.getDate()).padStart(2, '0')}-${String(tora.getMonth() + 1).padStart(2, '0')}-${tora.getFullYear()}`;
+
+    // Tu lógica actual para descargar el archivo usando el nuevo nombre seguro:
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Semanal");
+    
+    // 💾 Aquí ya no fallará porque 'nombreFecha' existe de forma global en la función
+    XLSX.writeFile(workbook, `Reporte_Semanal_${nombreFecha}.xlsx`);
+    
+    toast.success('Reporte descargado con éxito');
+
+  } catch (error) {
+    toast.dismiss('report-loading');
+    console.error("Error completo al exportar:", error);
+    toast.error('Ocurrió un error al generar el archivo');
+  }
+};
 
   const handleAutoUpdateStatus = async () => {
     try {

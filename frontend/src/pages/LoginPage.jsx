@@ -29,8 +29,8 @@ export default function LoginPage() {
   const fillDemo = (role) => {
     const creds = {
       admin: { email: 'admin@academico.cl', password: 'admin123' },
-      coordinator: { email: 'maria.gonzalez@academico.cl', password: 'coord123' },
-      user: { email: 'ana.rodriguez@academico.cl', password: 'user123' }
+      coordinator: { email: 'bastian.veliz@academico.cl', password: '12345' },
+      user: { email: 'may.araya@academico.cl', password: '12345' }
     };
     setEmail(creds[role].email);
     setPassword(creds[role].password);
@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="login-card slide-up">
         <div className="login-logo">
           <div className="login-logo-icon">🎓</div>
-          <h1>Gestión Académica</h1>
+          <h1>Educonnect</h1>
           <p>Plataforma de diplomados y magíster</p>
         </div>
 

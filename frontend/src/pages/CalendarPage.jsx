@@ -55,7 +55,11 @@ export default function CalendarPage() {
       const end = new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString();
       const res = await get(`/activities/calendar?start=${start}&end=${end}`, { silent: true });
 
-      let filtered = res.data;
+      let filtered = res.data?.data || res.data || [];
+      if (!Array.isArray(filtered)) {
+        filtered = [];
+      }
+
       if (filterProgram) {
         filtered = filtered.filter(e => e.program_id === parseInt(filterProgram));
       }

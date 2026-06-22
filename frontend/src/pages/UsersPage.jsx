@@ -82,8 +82,8 @@ export default function UsersPage() {
   };
 
   const roleBadge = (role) => {
-    const map = { admin: 'badge-danger', coordinator: 'badge-warning', teacher: 'badge-warning', user: 'badge-info', student: 'badge-info' };
-    const labels = { admin: 'Administrador', coordinator: 'Profesor', teacher: 'Profesor', user: 'Alumno', student: 'Alumno' };
+    const map = { admin: 'badge-danger', coordinator: 'badge-warning', user: 'badge-info'};
+    const labels = { admin: 'Coordinador', coordinator: 'Profesor', user: 'Alumno'};
     return <span className={`badge ${map[role] || 'badge-info'}`}>{labels[role] || role}</span>;
   };
 
@@ -109,9 +109,8 @@ export default function UsersPage() {
         <select className="form-select" style={{ width: 150 }} value={filterRole} onChange={e => setFilterRole(e.target.value)}>
           <option value="">Todos los roles</option>
           <option value="admin">Administrador</option>
-          <option value="teacher">Profesor</option>
-          <option value="coordinator">Coordinador</option>
-          <option value="student">Alumno</option>
+          <option value="coordinator">Profesor</option>
+          <option value="user">Alumno</option>
         </select>
       </div>
 
@@ -187,10 +186,9 @@ export default function UsersPage() {
               <div className="form-group">
                 <label className="form-label">Rol</label>
                 <select className="form-select" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
-                  <option value="student">Alumno</option>
-                  <option value="teacher">Profesor</option>
-                  <option value="coordinator">Coordinador</option>
-                  <option value="admin">Administrador</option>
+                  <option value="user">Alumno</option>
+                  <option value="coordinator">Profesor</option>         
+                  <option value="admin">Coordinador</option>
                 </select>
               </div>
               <div className="form-group">

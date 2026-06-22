@@ -6,8 +6,13 @@ const authorize = require('../middleware/authorize');
 
 router.use(authenticate);
 
+
+// Agrega esta línea en tu archivo de rutas
+router.get('/reports/weekly-services', serviceController.getWeeklyReport);
+
 // Reports (must be before :id routes)
 router.get('/export/menus-pdf', authorize('admin', 'coordinator', 'teacher'), serviceController.exportMenus);
+
 
 router.get('/', serviceController.getAll);
 router.get('/:id', serviceController.getById);

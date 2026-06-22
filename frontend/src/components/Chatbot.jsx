@@ -10,6 +10,8 @@ const STEPS = {
   SELECT_DATETIME: 'select_datetime',
   VIEW_AVAILABLE_ROOMS: 'view_available_rooms',
   SELECT_PROGRAM: 'select_program',
+  SELECT_TEACHER: 'select_teacher',
+  SELECT_SERVICES: 'select_services',
   CONFIRM: 'confirm',
   SUCCESS: 'success'
 };
@@ -17,9 +19,12 @@ const STEPS = {
 const STEP_LABELS = {
   initial: 'Inicio',
   view_rooms: 'Ver salas',
+  check_room: 'Disponibilidad sala',
   select_datetime: 'Fecha y hora',
   view_available_rooms: 'Elegir sala',
   select_program: 'Elegir programa',
+  select_teacher: 'Elegir Profesor',
+  select_services: 'Servicios',
   confirm: 'Confirmar',
   success: '¡Listo!'
 };
@@ -31,8 +36,12 @@ export default function Chatbot() {
   const [rooms, setRooms] = useState([]);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [programs, setPrograms] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [services, setServices] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [selectedProgram, setSelectedProgram] = useState(null);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [selectedServices, setSelectedServices] = useState([]);
   const [bookingData, setBookingData] = useState({ date: '', startTime: '09:00', endTime: '10:00', title: '' });
   const [loading, setLoading] = useState(false);
   const [typing, setTyping] = useState(false);
@@ -66,15 +75,21 @@ export default function Chatbot() {
   const fetchAllRooms = async () => {
     setLoading(true);
     try {
-      const [roomsRes, programsRes] = await Promise.all([
+      const [roomsRes, programsRes, servicesRes, teachersRes] = await Promise.all([
         get('/rooms?active=true&limit=50', { silent: true }),
-        get('/programs?limit=50', { silent: true })
+        get('/programs?limit=50', { silent: true }),
+        get('/services?limit=50', { silent: true }),
+        get('/users?role=coordinator&limit=100', { silent: true })
       ]);
       const r = roomsRes.data?.data || roomsRes.data || [];
       const p = programsRes.data?.data || programsRes.data || [];
+      const s = servicesRes?.data?.data || servicesRes?.data || [];
+      const t = teachersRes?.data?.data || teachersRes?.data || [];
       setRooms(r);
       setPrograms(p);
-      return { rooms: r, programs: p };
+      setServices(s);
+      setTeachers(t);
+      return { rooms: r, programs: p, services: s };
     } catch {
       addMessage('bot', 'Error al cargar datos. Intenta más tarde.');
       return null;
@@ -99,7 +114,7 @@ export default function Chatbot() {
       addMessage('bot', 'Cargando salas...');
       const data = await botTyping(fetchAllRooms);
       if (data) {
-        addMessage('bot', `Estas son las ${data.rooms.length} salas del sistema:`);
+        addMessage('bot', `Estas son las salas del sistema. Selecciona una para verificar su horario de disponibilidad:`);
       }
     } else if (option === 'book') {
       addMessage('user', 'Reservar una sala');
@@ -115,8 +130,10 @@ export default function Chatbot() {
       [STEPS.CHECK_ROOM]: STEPS.VIEW_ROOMS,
       [STEPS.SELECT_DATETIME]: STEPS.INITIAL,
       [STEPS.VIEW_AVAILABLE_ROOMS]: STEPS.SELECT_DATETIME,
-      [STEPS.SELECT_PROGRAM]: STEPS.VIEW_AVAILABLE_ROOMS,
-      [STEPS.CONFIRM]: STEPS.SELECT_PROGRAM,
+      [STEPS.SELECT_PROGRAM]: availableRooms.length > 0 ? STEPS.VIEW_AVAILABLE_ROOMS : STEPS.CHECK_ROOM,
+      [STEPS.SELECT_TEACHER]: STEPS.SELECT_PROGRAM,
+      [STEPS.SELECT_SERVICES]: STEPS.SELECT_TEACHER,
+      [STEPS.CONFIRM]: STEPS.SELECT_SERVICES,
     };
     setStep(prev[step] || STEPS.INITIAL);
   };
@@ -157,50 +174,66 @@ export default function Chatbot() {
     setSelectedRoom(room);
     addMessage('user', `Sala: ${room.name} (${room.capacidad} pers)`);
     setStep(STEPS.SELECT_PROGRAM);
-    addMessage('bot', `Perfecto, elegiste: **${room.name}**\n\nAhora selecciona un programa:`);
+    addMessage('bot', `Perfecto, elegiste: **${room.name}**\n\nAhora selecciona un programa académico obligatorio para continuar:`);
   };
 
   const selectProgram = (program) => {
     setSelectedProgram(program);
     addMessage('user', `Programa: ${program.name}`);
+    setStep(STEPS.SELECT_TEACHER);
+    addMessage('bot', `Excelente. Ahora puedes seleccionar el profesor para tu actividad:`);
+  };
+
+  const selectTeacher = (teacher) => {
+    setSelectedTeacher(teacher);
+    addMessage('user', `Profesor: ${teacher.name}`);
+    setStep(STEPS.SELECT_SERVICES);
+    addMessage('bot', `Casi listo. ¿Deseas agregar servicios adicionales para tu reserva?\n\nSelecciona los que necesites o haz clic en "continuar" si no requieres ninguno.`);
+  };
+
+  const handleServicesSubmit = () => {
+    const serviceNames = services.filter(s => selectedServices.includes(s.id)).map(s => s.name).join(', ');
+    addMessage('user', selectedServices.length > 0 ? `Servicios: ${serviceNames}` : 'Sin servicios adicionales');
     setStep(STEPS.CONFIRM);
-    addMessage('bot', `📋 **Resumen de la reserva**\n\n🏢 Sala: **${selectedRoom.name}**\n📚 Programa: **${program.name}**\n📅 Fecha: **${bookingData.date}**\n⏰ Horario: **${bookingData.startTime} - ${bookingData.endTime}**\n📝 Actividad: **${bookingData.title}**`);
+    addMessage('bot', `📋 **Resumen de la reserva**\n\n🏢 Sala: **${selectedRoom.name}**\n📚 Programa: **${selectedProgram?.name}**\n👨‍🏫 Profesor: **${selectedTeacher?.name || 'No asignado'}**\n📅 Fecha: **${bookingData.date}**\n⏰ Horario: **${bookingData.startTime} - ${bookingData.endTime}**\n📝 Actividad: **${bookingData.title || 'Clase de ' + selectedRoom.name}**\n🛠️ Servicios: **${serviceNames || 'Ninguno'}**`);
   };
 
   const confirmBooking = async () => {
     setLoading(true);
-    const startTime = `${bookingData.date} ${bookingData.startTime}:00`;
-    const endTime = `${bookingData.date} ${bookingData.endTime}:00`;
+    const startTimeISO = `${bookingData.date}T${bookingData.startTime}`;
+    const endTimeISO = `${bookingData.date}T${bookingData.endTime}`;
 
-    const available = await checkRoomAvailability(selectedRoom.id, startTime, endTime);
+    const available = await checkRoomAvailability(selectedRoom.id, `${bookingData.date} ${bookingData.startTime}:00`, `${bookingData.date} ${bookingData.endTime}:00`);
     if (!available) {
       addMessage('bot', '❌ La sala ya no está disponible. Elige otra sala u horario.');
-      setStep(STEPS.VIEW_AVAILABLE_ROOMS);
+      setStep(availableRooms.length > 0 ? STEPS.VIEW_AVAILABLE_ROOMS : STEPS.CHECK_ROOM);
       setLoading(false);
       return;
     }
 
     try {
-      await post('/activities', {
-        title: bookingData.title,
-        description: `Reserva de sala ${selectedRoom.name} vía chatbot`,
-        start_time: startTime,
-        end_time: endTime,
-        room_id: selectedRoom.id,
-        program_id: selectedProgram?.id || 1,
-        type: 'meeting',
-        status: 'scheduled'
+      await post('/requests', {
+        type: 'room',
+        title: bookingData.title || `Clase de ${selectedRoom.name}`,
+        description: `Clase registrada vía chatbot`,
+        start_time: startTimeISO,
+        end_time: endTimeISO,
+        room_id: String(selectedRoom.id),
+        program_id: String(selectedProgram.id),
+        teacher_id: selectedTeacher ? Number(selectedTeacher.id) : null, // 👈 ENVIAMOS EL ID AL BACKEND
+        service_ids: selectedServices.map(Number)
       }, { silent: true });
+
       setStep(STEPS.SUCCESS);
-      addMessage('bot', '✅ **¡Reserva confirmada!**\n\nTu actividad ya está en el calendario.');
+      addMessage('bot', '✅ **¡Reserva confirmada!**\n\nTu actividad ya está en el calendario con los servicios y catering vinculados.');
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message;
       if (errorMsg.toLowerCase().includes('conflicto') || errorMsg.toLowerCase().includes('ocupada')) {
-        addMessage('bot', `❌ La sala ya está ocupada en ese horario. Elige otra.`);
-        setStep(STEPS.VIEW_AVAILABLE_ROOMS);
+        addMessage('bot', `❌ La sala ya está ocupada en ese horario.`);
+        setStep(STEPS.INITIAL);
       } else {
         addMessage('bot', `Error: ${errorMsg}`);
-        setStep(STEPS.SELECT_DATETIME);
+        setStep(STEPS.INITIAL);
       }
     }
     setLoading(false);
@@ -228,8 +261,8 @@ export default function Chatbot() {
     try {
       const available = await checkRoomAvailability(selectedRoom.id, startTime, endTime);
       if (available) {
-        addMessage('bot', `✅ **${selectedRoom.name}** está **DISPONIBLE** el ${bookingData.date} de ${bookingData.startTime} a ${bookingData.endTime}.\n\n¿Quieres reservarla?`);
-        setStep(STEPS.CONFIRM);
+        addMessage('bot', `✅ **${selectedRoom.name}** está **DISPONIBLE** el ${bookingData.date}.\n\nPara continuar, primero selecciona el programa académico de la clase:`);
+        setStep(STEPS.SELECT_PROGRAM); // Ahora viaja a Programa para no romper la relación del menú del alumno
       } else {
         addMessage('bot', `❌ **${selectedRoom.name}** está **OCUPADA** en ese horario.\n\nPrueba con otro horario o elige otra sala.`);
         setStep(STEPS.VIEW_ROOMS);
@@ -265,6 +298,18 @@ export default function Chatbot() {
         addMessage('bot', 'Reserva cancelada.');
         setStep(STEPS.INITIAL);
         resetState();
+      }
+      return;
+    }
+
+    if (step === STEPS.SELECT_SERVICES) {
+      if (lowerMsg.includes('continuar') || lowerMsg.includes('siguiente') || lowerMsg.includes('omitir') || lowerMsg.includes('listo') || lowerMsg.includes('si') || lowerMsg.includes('sí')) {
+        handleServicesSubmit();
+      } else if (lowerMsg.includes('volver') || lowerMsg.includes('atrás')) {
+        addMessage('user', 'Volver');
+        goBack();
+      } else {
+        addMessage('bot', 'Por favor, usa el selector de servicios o escribe "continuar" para avanzar.');
       }
       return;
     }
@@ -324,8 +369,9 @@ export default function Chatbot() {
   const resetState = () => {
     setSelectedRoom(null);
     setSelectedProgram(null);
+    setSelectedTeacher(null);
     setAvailableRooms([]);
-    setBookingData({ date: '', startTime: '09:00', endTime: '10:00', title: '' });
+    setSelectedServices([]);
   };
 
   const [inputValue, setInputValue] = useState('');
@@ -431,7 +477,7 @@ export default function Chatbot() {
               </div>
             )}
 
-            {/* Room list (clickable to check availability) */}
+            {/* Room list */}
             {step === STEPS.VIEW_ROOMS && rooms.map(room => (
               <button key={room.id} onClick={() => checkSpecificRoom(room)}
                 style={{
@@ -459,7 +505,7 @@ export default function Chatbot() {
               </button>
             ))}
 
-            {/* Available rooms (selectable) */}
+            {/* Available rooms */}
             {step === STEPS.VIEW_AVAILABLE_ROOMS && availableRooms.map(room => (
               <button key={room.id} onClick={() => selectRoom(room)}
                 style={{
@@ -483,14 +529,14 @@ export default function Chatbot() {
               </button>
             ))}
 
-            {/* Program selection */}
+{/* Program selection */}
             {step === STEPS.SELECT_PROGRAM && programs.filter(p => p.active !== false).map(prog => (
               <button key={prog.id} onClick={() => selectProgram(prog)}
                 style={{
                   padding: '14px 16px', background: 'var(--bg-input)',
                   border: '1px solid var(--border-color)', borderRadius: 10,
                   cursor: 'pointer', textAlign: 'left',
-                  transition: 'all 0.15s'
+                  width: '100%', transition: 'all 0.15s'
                 }}
                 onMouseEnter={e => e.target.style.background = 'var(--bg-card-hover)'}
                 onMouseLeave={e => e.target.style.background = 'var(--bg-input)'}
@@ -503,6 +549,77 @@ export default function Chatbot() {
                 </div>
               </button>
             ))}
+
+            {/* 🔥 SELECCIÓN DE PROFESOR INTERACTIVO */}
+            {step === STEPS.SELECT_TEACHER && teachers.map(teacher => (
+              <button key={teacher.id} onClick={() => selectTeacher(teacher)}
+                style={{
+                  padding: '14px 16px', background: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)', borderRadius: 10,
+                  cursor: 'pointer', textAlign: 'left',
+                  width: '100%', transition: 'all 0.15s',
+                  display: 'flex', flexDirection: 'column', gap: 4
+                }}
+                onMouseEnter={e => e.target.style.background = 'var(--bg-card-hover)'}
+                onMouseLeave={e => e.target.style.background = 'var(--bg-input)'}
+              >
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{teacher.name}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{teacher.email}</div>
+              </button>
+            ))}
+
+            {/* Services selection */}
+            {step === STEPS.SELECT_SERVICES && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--bg-input)', padding: 12, borderRadius: 10, border: '1px solid var(--border-color)' }}>
+                {services.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '10px 0' }}>
+                    No hay servicios adicionales configurados en este momento.
+                  </div>
+                ) : (
+                  services.map(service => {
+                    const isSelected = selectedServices.includes(service.id);
+                    return (
+                      <div key={service.id} onClick={() => {
+                        if (isSelected) {
+                          setSelectedServices(selectedServices.filter(id => id !== service.id));
+                        } else {
+                          setSelectedServices([...selectedServices, service.id]);
+                        }
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 12px', background: isSelected ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-card)',
+                        border: isSelected ? '1px solid #6366f1' : '1px solid var(--border-color)',
+                        borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s'
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: 500, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{service.name}</div>
+                          {service.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{service.description}</div>}
+                        </div>
+                        <div style={{
+                          width: 20, height: 20, borderRadius: 4, border: '2px solid var(--border-color)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                          background: isSelected ? '#6366f1' : 'transparent', borderColor: isSelected ? '#6366f1' : 'var(--border-color)'
+                        }}>
+                          {isSelected && <HiOutlineCheck size={14} color="white" />}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <button onClick={handleServicesSubmit}
+                  style={{
+                    marginTop: 6, padding: '12px', borderRadius: 10, border: 'none',
+                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s'
+                  }}
+                  onMouseEnter={e => e.target.style.opacity = '0.9'}
+                  onMouseLeave={e => e.target.style.opacity = '1'}
+                >
+                  {selectedServices.length > 0 ? 'Continuar con servicios ➔' : 'Omitir / Continuar ➔'}
+                </button>
+              </div>
+            )}
 
             {/* Confirm buttons */}
             {step === STEPS.CONFIRM && (
@@ -628,7 +745,7 @@ export default function Chatbot() {
             <input type="text" value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={step === STEPS.SELECT_DATETIME || step === STEPS.CHECK_ROOM ? 'O escribe "volver"' : 'Escribe un mensaje...'}
+              placeholder={step === STEPS.SELECT_DATETIME || step === STEPS.CHECK_ROOM || step === STEPS.SELECT_SERVICES ? 'O escribe "volver"' : 'Escribe un mensaje...'}
               style={{
                 flex: 1, padding: '12px 18px', borderRadius: 20,
                 border: '1px solid var(--border-color)',
@@ -636,7 +753,7 @@ export default function Chatbot() {
                 outline: 'none', fontSize: '1rem'
               }}
             />
-            {(step !== STEPS.SELECT_DATETIME && step !== STEPS.CHECK_ROOM && step !== STEPS.CONFIRM && step !== STEPS.SUCCESS) && (
+            {(step !== STEPS.SELECT_DATETIME && step !== STEPS.CHECK_ROOM && step !== STEPS.CONFIRM && step !== STEPS.SUCCESS && step !== STEPS.SELECT_SERVICES) && (
               <button onClick={handleSend}
                 style={{
                   width: 38, height: 38, borderRadius: '50%',

@@ -110,6 +110,7 @@ class Activity {
    * Obtener actividades para el calendario (rango de fechas)
    */
   static async getForCalendar(startDate, endDate, role = null, userId = null, programIds = null) {
+    // Consulta limpia: SOLO cruzamos con programs y rooms
     let query = `
       SELECT a.id, a.title, a.start_time, a.end_time, a.status,
         p.name as program_name, p.type as program_type,
@@ -123,17 +124,27 @@ class Activity {
     `;
     const params = [startDate, endDate];
 
-    if (role === 'teacher' || role === 'coordinator') {
-      query += ' AND a.created_by = ?';
-      params.push(userId);
-    } else if (role === 'student' && programIds && programIds.length > 0) {
+    // 1. Rol de Usuario o Estudiante (Filtro por programas asignados)
+    if ((role === 'student' || role === 'user') && programIds && programIds.length > 0) {
       query += ' AND a.program_id IN (?)';
       params.push(programIds);
-    } else if (role === 'student') {
-      query += ' AND 1=0'; // No enrolled programs → no results
+    } 
+    // 2. Rol de Usuario o Estudiante (Si no posee ningún programa)
+    else if (role === 'student' || role === 'user') {
+      query += ' AND 1=0'; 
+    }
+    // 🔥 3. NUEVO: Rol de Coordinador / Profesor
+    // Si es coordinador, filtramos para que solo vea las actividades donde coincide su userId
+    else if ((role === 'coordinator') && userId) {
+      console.log(`🎯 FILTRANDO CALENDARIO PARA EL PROFESOR ID: ${userId}`);
+      query += ' AND a.created_by = ?';
+      params.push(userId);
     }
 
+    // Nota: El Administrador no entra en ningún "if", por lo que ejecuta la consulta limpia y ve TODO.
+
     query += ' ORDER BY a.start_time ASC';
+    
     const [rows] = await pool.query(query, params);
     return rows;
   }

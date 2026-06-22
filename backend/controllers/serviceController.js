@@ -235,6 +235,36 @@ const serviceController = {
     } catch (error) {
       next(error);
     }
+  },
+  async getWeeklyReport(req, res, next) {
+    try {
+      const { start_date, end_date } = req.query;
+      
+      if (!start_date || !end_date) {
+        return res.status(400).json({ success: false, message: 'start_date y end_date son obligatorios.' });
+      }
+
+      // Hacemos el JOIN cruzando las 3 tablas y sumando las cantidades de activity_services
+      const query = `
+        SELECT 
+          s.id AS service_id,
+          s.name AS service_name,
+          s.cost_per_person,
+          SUM(acts.quantity) AS total_quantity,
+          SUM(acts.quantity * s.cost_per_person) AS subtotal
+        FROM activity_services acts
+        INNER JOIN activities act ON acts.activity_id = act.id
+        INNER JOIN services s ON acts.service_id = s.id
+        WHERE DATE(act.start_time) >= ? AND DATE(act.start_time) <= ?
+        GROUP BY s.id, s.name, s.cost_per_person
+      `;
+
+      const [rows] = await pool.query(query, [start_date, end_date]);
+
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      next(error);
+    }
   }
 };
 

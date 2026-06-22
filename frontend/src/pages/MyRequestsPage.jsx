@@ -16,34 +16,66 @@ export default function MyRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ type: 'room', title: '', description: '', room_id: '', program_id: '', start_time: '', end_time: '', service_ids: [] });
+  const [coordinators, setCoordinators] = useState([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState('');
 
-  useEffect(() => { fetchData(); }, [triggerRefresh]);
+  // El useEffect principal que se ejecuta al cargar o refrescar
+  useEffect(() => {
+    fetchData();
+  }, [triggerRefresh, user]); // Añadimos user por si acaso tarda en cargar el login
 
   const fetchData = async () => {
     try {
-      const [reqRes, roomRes, progRes, servRes] = await Promise.all([
+      const promises = [
         get('/requests/my', { silent: true }),
         get('/rooms', { silent: true }),
         get('/programs', { silent: true }),
         get('/services', { silent: true })
-      ]);
-      setRequests(reqRes.data.data || reqRes.data);
-      setRooms(roomRes.data?.data || roomRes.data || []);
-      setPrograms(progRes.data?.data || progRes.data || []);
-      setServices(servRes.data?.data || servRes.data || []);
-    } catch {}
+      ];
+
+      // 🔥 AHORA: Si es admin O coordinator, cargamos los profesores
+      if (user?.role === 'admin' || user?.role === 'coordinator') {
+        promises.push(get('/requests/teachers', { silent: true }));
+      }
+
+      const responses = await Promise.all(promises);
+      
+      setRequests(responses[0].data?.data || responses[0].data || []);
+      setRooms(responses[1].data?.data || responses[1].data || []);
+      setPrograms(responses[2].data?.data || responses[2].data || []);
+      setServices(responses[3].data?.data || responses[3].data || []);
+      
+      // 🔥 Asignamos la lista si corresponde a cualquiera de los dos roles
+      if ((user?.role === 'admin' || user?.role === 'coordinator') && responses[4]) {
+        setCoordinators(responses[4].data?.data || responses[4].data || []);
+      }
+
+    } catch (error) {
+      console.error("Error cargando los datos de la página", error);
+    }
     setLoading(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await post('/requests', form, { successMessage: 'Solicitud enviada al administrador' });
+      // Permitimos el ID tanto para admin como para coordinator
+      const isAuthorizedRole = user?.role === 'admin' || user?.role === 'coordinator';
+
+      const payload = {
+        ...form,
+        teacher_id: isAuthorizedRole ? selectedTeacherId : null
+      };
+
+      await post('/requests', payload, { successMessage: 'Solicitud enviada con éxito' });
       setShowModal(false);
       setForm({ type: 'room', title: '', description: '', room_id: '', program_id: '', start_time: '', end_time: '', service_ids: [] });
+      setSelectedTeacherId(''); 
       triggerRefresh();
     } catch {}
   };
+
+
 
   const toggleService = (serviceId) => {
     setForm(prev => ({
@@ -64,6 +96,8 @@ export default function MyRequestsPage() {
 
   const pending = requests.filter(r => r.status === 'pending').length;
   const approved = requests.filter(r => r.status === 'approved').length;
+
+
 
   return (
     <div className="fade-in">
@@ -88,12 +122,14 @@ export default function MyRequestsPage() {
         </div>
       </div>
 
+
       {requests.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {requests.map(req => {
             const info = statusInfo(req.status);
             const reqServices = req.service_ids ? (Array.isArray(req.service_ids) ? req.service_ids : JSON.parse(req.service_ids)) : [];
             return (
+
               <div key={req.id} className="card" style={{ padding: 16, borderLeft: `4px solid ${info.color}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
@@ -144,10 +180,31 @@ export default function MyRequestsPage() {
                 <label className="form-label">Título *</label>
                 <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="Ej: Sala para clases de inglés" />
               </div>
+
               <div className="form-group">
                 <label className="form-label">Descripción</label>
                 <textarea className="form-textarea" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Detalles de la solicitud..." />
               </div>
+              {coordinators.length > 0 && (
+  <div className="form-group mb-3">
+    <label className="form-label style={{ fontWeight: 'bold' }}">
+      Seleccionar Profesor para la clase
+    </label>
+    <select
+      className="form-select"
+      value={selectedTeacherId}
+      onChange={e => setSelectedTeacherId(e.target.value)}
+      required
+    >
+      <option value="">-- Selecciona un profesor --</option>
+      {coordinators.map(t => (
+        <option key={t.id} value={t.id}>
+          {t.name} ({t.email})
+        </option>
+      ))}
+    </select>
+  </div>
+)}
               {form.type === 'room' && (
                 <>
                   <div className="form-row">

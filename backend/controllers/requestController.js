@@ -34,15 +34,35 @@ const requestController = {
     }
   },
 
+  async getTeachersForForm(req, res, next) {
+  try {
+    const Request = require('../models/Request');
+    const teachers = await Request.getAvailableTeachers();
+    res.json({ success: true, data: teachers });
+  } catch (error) {
+    next(error);
+  }
+},
+
+
   /**
    * POST /api/requests - Crear solicitud
    */
   async create(req, res, next) {
     try {
-      const { type, title, description, program_id, room_id, start_time, end_time, activity_id, service_ids } = req.body;
+      // 1. Agregamos teacher_id al destructuring del body
+      const { type, title, description, program_id, room_id, start_time, end_time, activity_id, service_ids, teacher_id } = req.body;
 
       if (!type || !title) {
         return res.status(400).json({ success: false, message: 'Tipo y título son obligatorios.' });
+      }
+
+      // 2. LÓGICA DEL PROFESOR: Determinamos quién será el profe de esta solicitud
+      let finalTeacherId = null;
+      if (req.user.role === 'coordinator') {
+        finalTeacherId = req.user.id; // Auto-asignación para el chat y coordinators
+      } else if (req.user.role === 'admin') {
+       finalTeacherId = teacher_id || req.user.id; // Asignación manual o fallback al admin
       }
 
       // Si es solicitud de sala, verificar disponibilidad
@@ -57,10 +77,15 @@ const requestController = {
         }
       }
 
+      // 3. Enviamos finalTeacherId al modelo Request (necesitarás asegurarte de que
+      // tu modelo Request / tabla requests acepte esta columna nueva o usar el 'requested_by' para esto)
       const request = await Request.create({
-        type, title, description, requested_by: req.user.id,
-        program_id, room_id, start_time, end_time, activity_id, service_ids
+        type, title, description, 
+        requested_by: finalTeacherId || req.user.id, // Guardamos al profesor como el solicitante real
+        program_id, room_id, start_time, end_time, activity_id, service_ids,teacher_id: finalTeacherId // Guardamos el teacher_id en la columna correspondiente
       });
+
+      // ... Resto de tu código (Notificar admins y logAudit quedan igual) ...
 
       // Notificar a admins
       const [admins] = await pool.execute("SELECT id FROM users WHERE role = 'admin' AND active = TRUE");
@@ -97,9 +122,20 @@ const requestController = {
       // Si es solicitud de sala, crear la actividad
       if (request.type === 'room' && request.room_id) {
         const [actResult] = await pool.execute(
+          // Modificamos el INSERT para que el created_by (o teacher_id si lo creaste) sea el profesor (requested_by)
+          // en lugar de la persona que está haciendo clic en aprobar (req.user.id)
           `INSERT INTO activities (title, description, program_id, room_id, created_by, start_time, end_time, status) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [request.title, request.description, request.program_id, request.room_id, req.user.id, request.start_time, request.end_time, 'scheduled']
+          [
+            request.title, 
+            request.description, 
+            request.program_id, 
+            request.room_id, 
+            request.requested_by, // 🔥 AQUÍ ESTÁ LA MAGIA: El profesor viaja de la Request a la Actividad
+            request.start_time, 
+            request.end_time, 
+            'scheduled'
+          ]
         );
 
         // Asignar servicios solicitados a la actividad

@@ -1,17 +1,17 @@
 const pool = require('../config/db');
 
 class Request {
-  static async create({ type, title, description, requested_by, program_id, room_id, start_time, end_time, activity_id, service_ids }) {
+  static async create({ type, title, description, requested_by, teacher_id, program_id, room_id, start_time, end_time, activity_id, service_ids }) {
     const servicesJson = service_ids ? JSON.stringify(service_ids) : null;
     const params = [
-      type, title, description, requested_by,
+      type, title, description, requested_by, teacher_id || null,
       program_id || null, room_id || null,
       start_time || null, end_time || null,
       activity_id || null, servicesJson, 'pending'
     ];
     const [result] = await pool.execute(
-      `INSERT INTO requests (type, title, description, requested_by, program_id, room_id, start_time, end_time, activity_id, service_ids, status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO requests (type, title, description, requested_by, teacher_id, program_id, room_id, start_time, end_time, activity_id, service_ids, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params
     );
     return this.findById(result.insertId);
@@ -20,9 +20,11 @@ class Request {
   static async findById(id) {
     const [rows] = await pool.execute(`
       SELECT r.*, u.name as user_name, u.email as user_email,
+        t.id as teacher_id, t.name as teacher_name, t.email as teacher_email,
         p.name as program_name, rom.name as room_name, a.title as activity_title
       FROM requests r
       LEFT JOIN users u ON u.id = r.requested_by
+      LEFT JOIN users t ON t.id = r.teacher_id
       LEFT JOIN programs p ON p.id = r.program_id
       LEFT JOIN rooms rom ON rom.id = r.room_id
       LEFT JOIN activities a ON a.id = r.activity_id
@@ -34,9 +36,11 @@ class Request {
   static async findAll({ status, type, requested_by, limit = 50, offset = 0 } = {}) {
     let query = `
       SELECT r.*, u.name as user_name, u.email as user_email,
+        t.id as teacher_id, t.name as teacher_name, t.email as teacher_email,
         p.name as program_name, rom.name as room_name, a.title as activity_title
       FROM requests r
       LEFT JOIN users u ON u.id = r.requested_by
+      LEFT JOIN users t ON t.id = r.teacher_id
       LEFT JOIN programs p ON p.id = r.program_id
       LEFT JOIN rooms rom ON rom.id = r.room_id
       LEFT JOIN activities a ON a.id = r.activity_id
@@ -99,6 +103,13 @@ class Request {
     );
 
     return { conflicts: activities.length + requests.length > 0, activities, requests };
+  }
+  static async getAvailableTeachers() {
+    // Traemos id, name y email de los usuarios cuyo rol sea 'coordinator'
+    const [rows] = await pool.execute(
+      "SELECT id, name, email FROM users WHERE role = 'coordinator' ORDER BY name ASC"
+    );
+    return rows;
   }
 }
 

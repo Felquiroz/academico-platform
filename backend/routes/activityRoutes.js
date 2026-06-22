@@ -6,14 +6,15 @@ const serviceController = require('../controllers/serviceController');
 const authenticate = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const checkRole = require('../middleware/authRole');
+const auth = require('../middleware/auth');
 
 router.use(authenticate);
 
 // Ruta protegida: solo 'user' (estudiante) puede acceder
-router.get('/my-activities', 
+router.get('/my-activities/with-services', 
   auth, 
   checkRole(['user', 'alumno']), // Solo permite estos roles
-  activityController.getMyActivities
+  activityController.getMyActivitiesWithServices
 );
 
 // Ruta protegida: solo 'user' (estudiante) puede acceder

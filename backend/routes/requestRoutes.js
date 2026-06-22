@@ -9,6 +9,7 @@ router.use(authenticate);
 // Todas las solicitudes (admin/coordinador)
 router.get('/', authorize('admin', 'coordinator', 'teacher'), requestController.getAll);
 
+router.get('/teachers', requestController.getTeachersForForm);
 // Mis solicitudes
 router.get('/my', requestController.getMyRequests);
 

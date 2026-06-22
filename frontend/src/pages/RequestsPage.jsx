@@ -17,23 +17,36 @@ export default function RequestsPage() {
   const [filter, setFilter] = useState('pending');
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ type: 'room', title: '', description: '', room_id: '', program_id: '', start_time: '', end_time: '', service_ids: [] });
-
+  const [coordinators, setCoordinators] = useState([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState('');
   useEffect(() => { fetchAll(); }, [filter, triggerRefresh]);
 
   const fetchAll = async () => {
     try {
       const params = filter !== 'all' ? `?status=${filter}` : '';
-      const [reqRes, roomRes, progRes, servRes] = await Promise.all([
+      const [reqRes, roomRes, progRes, servRes, teacherRes] = await Promise.all([
         get(`/requests${params}`, { silent: true }),
         get('/rooms', { silent: true }),
         get('/programs', { silent: true }),
-        get('/services', { silent: true })
+        get('/services', { silent: true }),
+        get('/requests/teachers', { silent: true }) // NUEVO: Traemos los coordinadores para el form
       ]);
       setRequests(reqRes.data.data || reqRes.data);
       setRooms(roomRes.data?.data || roomRes.data || []);
       setPrograms(progRes.data?.data || progRes.data || []);
       setServices(servRes.data?.data || servRes.data || []);
-    } catch {}
+      setCoordinators(teacherRes.data?.data || teacherRes.data || []); // NUEVO: Guardamos los coordinadores en el estado
+    // 🔍 EL CHIVATO: Abre la consola del navegador (F12) y mira qué imprime esto:
+      console.log("🔴 RESPUESTA DE PROFESORES EN EL COORD:", teacherRes?.data);
+
+      // Guardamos los datos asegurando los caminos comunes de Axios
+      const listaProfesores = teacherRes?.data?.data || teacherRes?.data || [];
+      setCoordinators(listaProfesores); 
+
+    } catch (error) {
+      console.error("🔴 ERROR EN FETCHALL DEL COORD:", error);
+    } 
+    
     setLoading(false);
   };
 
@@ -55,14 +68,31 @@ export default function RequestsPage() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await post('/requests', form, { successMessage: 'Solicitud enviada' });
-      setShowModal(false);
-      setForm({ type: 'room', title: '', description: '', room_id: '', program_id: '', start_time: '', end_time: '', service_ids: [] });
-      triggerRefresh();
-    } catch {}
-  };
+  e.preventDefault();
+  try {
+    // 1. Creamos el objeto limpio con los datos
+    const payload = {
+      ...form,
+      teacher_id: selectedTeacherId ? Number(selectedTeacherId) : null
+    };
+
+    // 2. Imprimimos en la consola (fuera del objeto) para revisar qué viaja
+    console.log("✈️ PAYLOAD QUE VA HACIA EL BACKEND:", payload);
+
+    // 3. Enviamos el payload al servidor
+    await post('/requests', payload, { successMessage: 'Solicitud enviada' });
+    
+    // 4. Si todo sale bien, limpiamos y cerramos
+    setShowModal(false);
+    setForm({ type: 'room', title: '', description: '', room_id: '', program_id: '', start_time: '', end_time: '', service_ids: [] });
+    setSelectedTeacherId(''); 
+    triggerRefresh();
+    
+  } catch (error) {
+    // 🕵️‍♂️ Si el servidor tira error, lo atrapamos aquí para que no se refresque la pantalla
+    console.error("💥 Error al enviar la solicitud:", error);
+  }
+};
 
   const toggleService = (serviceId) => {
     setForm(prev => ({
@@ -180,6 +210,28 @@ export default function RequestsPage() {
                 <label className="form-label">Descripción</label>
                 <textarea className="form-textarea" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
               </div>
+              
+  <div className="form-group mb-3">
+    <label className="form-label" style={{ fontWeight: 'bold' }}>
+      Seleccionar Profesor para la clase
+    </label>
+    <select
+      className="form-select"
+      value={selectedTeacherId}
+      onChange={e => setSelectedTeacherId(e.target.value)}
+      required
+    >
+      <option value="">-- Selecciona un profesor --</option>
+      {coordinators.map(t => (
+        <option key={t.id} value={t.id}>
+          {t.name} ({t.email})
+        </option>
+      ))}
+    </select>
+  </div>
+  
+
+
               {form.type === 'room' && (
                 <>
                   <div className="form-row">

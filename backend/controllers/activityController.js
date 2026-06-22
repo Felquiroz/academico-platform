@@ -117,9 +117,25 @@ const activityController = {
         endDate = new Date(monday.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
       }
 
+      // 🚀 SQL EVOLUCIONADO: Añadimos subconsultas para modalidades de asistencia y menús
       let query = `
         SELECT a.*, p.name as program_name, p.type as program_type,
-          r.name as room_name, u.name as creator_name
+          r.name as room_name, u.name as creator_name,
+          
+          -- 👥 Conteo de asistentes confirmados por modalidad
+          (SELECT COUNT(*) FROM activity_attendees WHERE activity_id = a.id AND modality = 'presencial') as attendees_presencial,
+          (SELECT COUNT(*) FROM activity_attendees WHERE activity_id = a.id AND modality = 'remoto') as attendees_remoto,
+          
+          -- ☕ Resumen de menús concatenados por tipo (ej: "1 Coffee Break Basico, 2 Coffee Break Vegetarianos")
+          (SELECT GROUP_CONCAT(CONCAT(menu_counts.total, ' ', menu_counts.name) SEPARATOR ', ')
+ FROM (
+   SELECT mc.activity_id, s.name, COUNT(*) as total
+   FROM menu_choices mc
+   JOIN services s ON s.id = mc.service_id
+   GROUP BY mc.activity_id, s.name
+ ) as menu_counts
+ WHERE menu_counts.activity_id = a.id) as menu_summary
+           
         FROM activities a
         LEFT JOIN programs p ON p.id = a.program_id
         LEFT JOIN rooms r ON r.id = a.room_id
@@ -135,7 +151,7 @@ const activityController = {
 
       const [rows] = await pool.query(query, params);
 
-      // Agrupar por día
+      // Agrupar por día (Mantenemos tu lógica intacta por si React la consume estructurada así en otra sección)
       const grouped = {};
       rows.forEach(row => {
         const day = new Date(row.start_time).toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -143,7 +159,8 @@ const activityController = {
         grouped[day].push(row);
       });
 
-      res.json({ success: true, data: grouped, total: rows.length, week: { start: startDate, end: endDate } });
+      // Enviamos también 'rows' plano por si React lo prefiere directo para Excel
+      res.json({ success: true, data: grouped, rawRows: rows, total: rows.length, week: { start: startDate, end: endDate } });
     } catch (error) {
       next(error);
     }
@@ -333,25 +350,41 @@ const activityController = {
   async getCalendar(req, res, next) {
     try {
       const { start, end } = req.query;
+      console.log('🔴 1. INICIO GET CALENDAR - Fechas:', { start, end });
+      console.log('🔴 2. USUARIO ENTRANTE:', req.user);
+
       if (!start || !end) {
         return res.status(400).json({ success: false, message: 'start y end son obligatorios.' });
       }
-      const role = req.user.role;
-      const userId = req.user.id;
 
-      // Admin ve todo, teacher/coordinator ve sus actividades, student ve actividades de sus programas
-      let filterUserIds = null;
-      if (role === 'student') {
+      // Aseguramos rol y ID
+      const role = String(req.user?.role || '').toLowerCase().trim();
+      const userId = req.user?.idusers || req.user?.id;
+      console.log(`🔴 3. ROL NORMALIZADO: "${role}" | ID: ${userId}`);
+
+      let programIds = [];
+
+      if (role === 'student' || role === 'user') {
+        console.log(`🔴 4. Buscando programas para el usuario ${userId}...`);
+        // ⚠️ Si esta tabla "program_enrollments" se llama distinto en tu BD, aquí es donde explota
         const [enrollments] = await pool.execute(
           'SELECT DISTINCT program_id FROM program_enrollments WHERE user_id = ?',
           [userId]
         );
-        filterUserIds = enrollments.map(e => e.program_id);
+        programIds = enrollments.map(e => e.program_id);
+        console.log('🔴 5. Programas encontrados:', programIds);
       }
 
-      const activities = await Activity.getForCalendar(start, end, role, userId, filterUserIds);
+      const Activity = require('../models/Activity');
+      const activities = await Activity.getForCalendar(start, end, role, userId, programIds);
+      
+      console.log(`🔴 6. EXITOSO. Actividades enviadas a React:`, activities.length);
       res.json({ success: true, data: activities });
+
     } catch (error) {
+      // SI ALGO EXPLOTA, LO VEREMOS AQUÍ EN ROJO
+      console.error('🔴 🚨 ERROR CRÍTICO EN getCalendar:', error.message);
+      console.error(error);
       next(error);
     }
   },
@@ -377,16 +410,14 @@ const activityController = {
 
 
   /**
-   * GET /api/activities/my-activities
-   * Obtiene las actividades basándose en las inscripciones del alumno
+   * 1. GET /api/activities/my-activities
    */
   async getMyActivities(req, res, next) {
     try {
       const userId = req.user.id;
       const userRole = req.user.role;
       
-      // Para coordinadores/profesores: mostrar actividades que crearon
-      if (userRole === 'coordinator' || userRole === 'teacher' || userRole === 'admin') {
+      if (userRole === 'coordinator' || userRole === 'teacher' || userRole === 'admin' || userRole === 'prof') {
         const [rows] = await pool.query(`
           SELECT a.*, p.name as program_name, p.type as program_type,
             r.name as room_name, r.capacity as room_capacity,
@@ -400,22 +431,10 @@ const activityController = {
         return res.json({ success: true, data: rows, type: 'enrolled' });
       }
       
-      // Primero verificar si tiene inscripciones en programas
-      const [programEnrollments] = await pool.execute(
-        'SELECT program_id FROM program_enrollments WHERE user_id = ?',
-        [userId]
-      );
+      const [programEnrollments] = await pool.execute('SELECT program_id FROM program_enrollments WHERE user_id = ?', [userId]);
+      const [activityEnrollments] = await pool.execute('SELECT DISTINCT program_id FROM activity_attendees aa JOIN activities a ON a.id = aa.activity_id WHERE aa.user_id = ?', [userId]);
 
-      // También verificar inscripciones directas a actividades
-      const [activityEnrollments] = await pool.execute(
-        'SELECT DISTINCT program_id FROM activity_attendees aa JOIN activities a ON a.id = aa.activity_id WHERE aa.user_id = ?',
-        [userId]
-      );
-
-      const programIds = [
-        ...programEnrollments.map(e => e.program_id),
-        ...activityEnrollments.map(e => e.program_id)
-      ];
+      const programIds = [...programEnrollments.map(e => e.program_id), ...activityEnrollments.map(e => e.program_id)];
 
       if (programIds.length > 0) {
         const uniqueIds = [...new Set(programIds)];
@@ -438,18 +457,30 @@ const activityController = {
       next(error);
     }
   },
-  
+
   /**
-   * GET /api/activities/my-activities/with-services
-   * Obtiene actividades del estudiante con servicios asignados
+   * 2. GET /api/activities/my-activities/with-services
    */
   async getMyActivitiesWithServices(req, res, next) {
     try {
       const userId = req.user.id;
+      
+      const [programEnrollments] = await pool.execute('SELECT program_id FROM program_enrollments WHERE user_id = ?', [userId]);
+      const [activityEnrollments] = await pool.execute('SELECT DISTINCT program_id FROM activity_attendees aa JOIN activities a ON a.id = aa.activity_id WHERE aa.user_id = ?', [userId]);
+
+      const programIds = [...programEnrollments.map(e => e.program_id), ...activityEnrollments.map(e => e.program_id)];
+
+      if (programIds.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      const uniqueIds = [...new Set(programIds)];
+
       const [rows] = await pool.query(`
         SELECT a.*, p.name as program_name, p.type as program_type,
           r.name as room_name, r.capacity as room_capacity,
           COALESCE(aa.status, 'registered') as attendance_status,
+          aa.modality, 
           (SELECT JSON_ARRAYAGG(JSON_OBJECT('service_id', av.service_id, 'service_name', s.name, 'quantity', av.quantity))
            FROM activity_services av JOIN services s ON s.id = av.service_id WHERE av.activity_id = a.id
           ) as _services
@@ -457,28 +488,23 @@ const activityController = {
         LEFT JOIN programs p ON p.id = a.program_id
         LEFT JOIN rooms r ON r.id = a.room_id
         LEFT JOIN activity_attendees aa ON aa.activity_id = a.id AND aa.user_id = ?
-        WHERE a.id IN (
-          SELECT activity_id FROM activity_services
-        )
-        AND a.program_id IN (
-          SELECT program_id FROM program_enrollments WHERE user_id = ?
-        )
-        AND a.status = 'scheduled'
-        AND a.start_time > NOW()
+        WHERE a.program_id IN (?) AND a.status != 'cancelled'
         ORDER BY a.start_time ASC
-      `, [userId, userId]);
+      `, [userId, uniqueIds]);
+
       rows.forEach(r => {
         if (typeof r._services === 'string') {
           try { r._services = JSON.parse(r._services); } catch { r._services = []; }
         }
         if (!r._services) r._services = [];
       });
+      
       res.json({ success: true, data: rows });
     } catch (error) {
       next(error);
     }
   },
-
+  
   /**
    * GET /api/activities/my-programs
    * Obtiene los programas en los que está inscrito el alumno

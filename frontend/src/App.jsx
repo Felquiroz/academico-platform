@@ -44,21 +44,21 @@ function AppRoutes() {
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<DashboardPage />} />
         <Route path="calendar" element={<CalendarPage />} />
-        <Route path="my-activities" element={<MyActivitiesPage />} />
-        <Route path="activities" element={<ActivitiesPage />} />
-        <Route path="enrollments" element={<ProtectedRoute roles={['admin', 'coordinator', 'teacher']}><EnrollmentsPage /></ProtectedRoute>} />
-        <Route path="programs" element={<ProgramsPage />} />
-        <Route path="rooms" element={<RoomsPage />} />
-        <Route path="services" element={<ServicesPage />} />
-        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="my-activities" element={<ProtectedRoute roles={['user']}><MyActivitiesPage/></ProtectedRoute>} />
+        <Route path="activities" element={<ProtectedRoute roles={['admin']}><ActivitiesPage /></ProtectedRoute>} />
+        <Route path="enrollments" element={<ProtectedRoute roles={['admin']}><EnrollmentsPage /></ProtectedRoute>} /> 
+        <Route path="programs" element={<ProtectedRoute roles={['admin']}><ProgramsPage /></ProtectedRoute>} />
+        <Route path="rooms" element={<ProtectedRoute roles={['admin']}><RoomsPage /></ProtectedRoute>} />
+        <Route path="services" element={<ProtectedRoute roles={['admin']}><ServicesPage /></ProtectedRoute>} />
+        <Route path="notifications" element={<ProtectedRoute roles={['admin']}><NotificationsPage /></ProtectedRoute>} />
 
         {/* Rutas restringidas */}
-        <Route path="users" element={<ProtectedRoute roles={['admin', 'coordinator', 'teacher']}><UsersPage /></ProtectedRoute>} />
-        <Route path="user-stats" element={<ProtectedRoute roles={['admin', 'coordinator']}><UserStatsPage /></ProtectedRoute>} />
-        <Route path="requests" element={<ProtectedRoute roles={['admin', 'coordinator', 'teacher']}><RequestsPage /></ProtectedRoute>} />
-        <Route path="my-requests" element={<MyRequestsPage />} />
+        <Route path="users" element={<ProtectedRoute roles={['admin']}><UsersPage /></ProtectedRoute>} />
+        <Route path="user-stats" element={<ProtectedRoute roles={['admin']}><UserStatsPage /></ProtectedRoute>} />
+        <Route path="requests" element={<ProtectedRoute roles={['admin', 'coordinator']}><RequestsPage /></ProtectedRoute>} />
+        <Route path="my-requests" element={<MyRequestsPage roles= {['coordinator']} />} />
         <Route path="menu-confirmation" element={<MenuConfirmationPage />} />
-        <Route path="attendance" element={<ProtectedRoute roles={['admin', 'coordinator', 'teacher']}><AttendancePage /></ProtectedRoute>} />
+        <Route path="attendance" element={<ProtectedRoute roles={['admin']}><AttendancePage /></ProtectedRoute>} />
         <Route path="audit" element={<ProtectedRoute roles={['admin']}><AuditPage /></ProtectedRoute>} />
       </Route>
 

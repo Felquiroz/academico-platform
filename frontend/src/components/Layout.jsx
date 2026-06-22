@@ -8,7 +8,7 @@ import { HiOutlineHome, HiOutlineCalendar, HiOutlineClipboardList, HiOutlineOffi
 import Chatbot from './Chatbot';
 
 export default function Layout() {
-  const { user, logout, canManage, isAdmin } = useAuth();
+  const { user, logout } = useAuth(); 
   const navigate = useNavigate();
   const { get } = useApi();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -75,43 +75,66 @@ export default function Layout() {
     navigate('/login');
   };
 
-  const navItems = canManage() 
-    ? [
-        { section: 'Principal', items: [
-          { to: '/', icon: <HiOutlineHome />, label: 'Dashboard' },
-          { to: '/calendar', icon: <HiOutlineCalendar />, label: 'Calendario' },
-          { to: '/my-activities', icon: <HiOutlineClipboardList />, label: 'Mis Actividades' },
-          { to: '/activities', icon: <HiOutlineClipboardList />, label: 'Gestión Actividades' },
-          { to: '/my-requests', icon: <HiOutlineClipboardList />, label: 'Mis Solicitudes' },
-          { to: '/attendance', icon: <HiOutlineClipboardList />, label: 'Asistencia' },
-        ]},
-        { section: 'Gestión', items: [
-          { to: '/programs', icon: <HiOutlineAcademicCap />, label: 'Programas' },
-          { to: '/rooms', icon: <HiOutlineOfficeBuilding />, label: 'Salas' },
-          { to: '/services', icon: <HiOutlineCog />, label: 'Servicios' },
-          { to: '/menu-confirmation', icon: <HiOutlineCog />, label: 'Menús Alumnos' },
-          { to: '/requests', icon: <HiOutlineClipboardList />, label: 'Solicitudes' },
-          { to: '/enrollments', icon: <HiOutlineUsers />, label: 'Inscripciones' },
-          { to: '/user-stats', icon: <HiOutlineSearch />, label: 'Estadísticas Users' },
-        ]},
-        { section: 'Sistema', items: [
-          { to: '/users', icon: <HiOutlineUsers />, label: 'Usuarios' },
-          { to: '/notifications', icon: <HiOutlineBell />, label: 'Notificaciones', badge: unreadCount },
-          ...(isAdmin() ? [{ to: '/audit', icon: <HiOutlineShieldCheck />, label: 'Auditoría' }] : []),
-        ]},
-      ]
-    : [
-        { section: 'Principal', items: [
-          { to: '/', icon: <HiOutlineHome />, label: 'Mi Dashboard' },
-          { to: '/my-activities', icon: <HiOutlineCalendar />, label: 'Mis Clases' },
-          { to: '/calendar', icon: <HiOutlineCalendar />, label: 'Calendario' },
-          { to: '/my-requests', icon: <HiOutlineClipboardList />, label: 'Solicitudes' },
-          { to: '/menu-confirmation', icon: <HiOutlineCog />, label: 'Confirmar Menú' },
-        ]},
-        { section: 'Sistema', items: [
-          { to: '/notifications', icon: <HiOutlineBell />, label: 'Notificaciones', badge: unreadCount },
-        ]},
-      ];
+  // ==========================================
+  // LÓGICA DINÁMICA DEL MENÚ SEGÚN EL ROL
+  // ==========================================
+  const role = user?.role;
+  
+  // Dashboard y Calendario (Bases para todos)
+  const principalItems = [
+    { to: '/', icon: <HiOutlineHome />, label: 'Dashboard' },
+    { to: '/calendar', icon: <HiOutlineCalendar />, label: 'Calendario' }
+  ];
+  const gestionItems = [];
+  const sistemaItems = [];
+
+  // --- REGLAS ROL: USER ---
+  if (role === 'user') {
+    principalItems.push(
+      { to: '/my-activities', icon: <HiOutlineClipboardList />, label: 'Mis Actividades' }
+    );
+  }
+
+  // --- REGLAS ROL: COORDINATOR ---
+  if (role === 'coordinator') {
+    principalItems.push(
+      { to: '/my-requests', icon: <HiOutlineClipboardList />, label: 'Mis Solicitudes' }
+    );
+  }
+
+  // --- REGLAS ROL: ADMIN ---
+  if (role === 'admin') {
+    principalItems.push(
+      { to: '/activities', icon: <HiOutlineClipboardList />, label: 'Gestión Actividades' },
+      { to: '/attendance', icon: <HiOutlineClipboardList />, label: 'Asistencia' }
+    );
+    
+    gestionItems.push(
+      { to: '/programs', icon: <HiOutlineAcademicCap />, label: 'Programas' },
+      { to: '/rooms', icon: <HiOutlineOfficeBuilding />, label: 'Salas' },
+      { to: '/services', icon: <HiOutlineCog />, label: 'Servicios' },
+      { to: '/requests', icon: <HiOutlineClipboardList />, label: 'Solicitudes' },
+      { to: '/enrollments', icon: <HiOutlineUsers />, label: 'Inscripciones' },
+      { to: '/users', icon: <HiOutlineUsers />, label: 'Usuarios' },
+      { to: '/user-stats', icon: <HiOutlineSearch />, label: 'Estadísticas Users' }
+    );
+    
+    sistemaItems.push(
+      { to: '/notifications', icon: <HiOutlineBell />, label: 'Notificaciones', badge: unreadCount },
+      { to: '/audit', icon: <HiOutlineShieldCheck />, label: 'Auditoría' }
+    );
+  }
+
+  // Construimos el array final
+  const navItems = [
+    { section: 'Principal', items: principalItems },
+  ];
+  if (gestionItems.length > 0) {
+    navItems.push({ section: 'Gestión', items: gestionItems });
+  }
+  if (sistemaItems.length > 0) {
+    navItems.push({ section: 'Sistema', items: sistemaItems });
+  }
 
   return (
     <div className="app-layout">
@@ -223,7 +246,9 @@ export default function Layout() {
           </div>
           <div className="sidebar-user-info">
             <div className="sidebar-user-name">{user?.name}</div>
-            <div className="sidebar-user-role">{user?.role}</div>
+            <div className="sidebar-user-role">
+              {role === 'admin' ? 'Administrador' : role === 'coordinator' ? 'Profesor' : 'Alumno'}
+            </div>
           </div>
           <button className="btn btn-icon" onClick={handleLogout} title="Cerrar sesión" id="logout-btn">
             <HiOutlineLogout />
@@ -236,7 +261,8 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <Chatbot />
+      {/* El Chatbot ahora solo se renderiza si el rol es admin o coordinator */}
+      {(role === 'admin' || role === 'coordinator') && <Chatbot />}
     </div>
   );
 }

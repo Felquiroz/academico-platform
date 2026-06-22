@@ -232,9 +232,8 @@ async function initTables() {
       );
       console.log('✅ Usuarios de prueba creados:');
       console.log('   Admin:       admin@academico.cl / admin123');
-      console.log('   Coordinador: maria.gonzalez@academico.cl / coord123');
-      console.log('   Coordinador: carlos.perez@academico.cl / coord123');
-      console.log('   Usuario:     ana.rodriguez@academico.cl / user123');
+      console.log('   Coordinador: bastian.veliz@academico.cl / 12345');
+      console.log('   Usuario:     may.araya@academico.cl / 12345');
     } else {
       console.log('📋 Usuarios ya existentes:', users[0].count);
     }
